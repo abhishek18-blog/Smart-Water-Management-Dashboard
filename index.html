@@ -115,10 +115,21 @@
                     <label class="block text-sm font-medium mb-1 text-slate-300 font-mono text-[10px] uppercase tracking-wider">Access Key</label>
                     <input type="password" id="loginPass" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-white font-mono text-sm" placeholder="••••••••" required>
                 </div>
-                <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all active:scale-95 uppercase tracking-widest text-xs">
+                <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all active:scale-95 uppercase tracking-widest text-xs">
                     Authorize Connection
                 </button>
             </form>
+
+            <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-700"></div></div>
+                <div class="relative flex justify-center text-xs uppercase"><span class="bg-slate-900 px-2 text-slate-500 font-mono">Or connect with</span></div>
+            </div>
+
+            <button id="googleBtn" class="w-full bg-white hover:bg-slate-100 text-slate-900 font-bold py-3 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-3 text-xs uppercase tracking-widest">
+                <i class="fab fa-google text-lg"></i>
+                Google SSO
+            </button>
+
             <div id="loginError" class="mt-4 text-red-400 text-xs font-mono text-center hidden">ERROR: INVALID CREDENTIALS</div>
         </div>
     </div>
@@ -224,20 +235,30 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getAuth, 
+            signInWithEmailAndPassword, 
+            signInWithCustomToken, 
+            signInAnonymously, 
+            onAuthStateChanged, 
+            signOut,
+            GoogleAuthProvider,
+            signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
         // ==========================================
         // 1. DATABASE CONFIGURATION (Southeast Asia)
         // ==========================================
         const firebaseConfig = {
-           apiKey:  "AIzaSyA5iaV9POVbeOxz5KlWaAi2Z_rxgvrflbE",
+              apiKey:  "AIzaSyA5iaV9POVbeOxz5KlWaAi2Z_rxgvrflbE",
             authDomain: "project-water-b2dad.firebaseapp.com",
             databaseURL: "https://project-water-b2dad-default-rtdb.asia-southeast1.firebasedatabase.app/",
             projectId: "project-water-b2dad",
             storageBucket: "project-water-b2dad.firebasestorage.app",
             messagingSenderId: "2593146798",
             appId: "1:2593146798:web:e964319324a7599fa56a3f"
+
         };
 
         // ==========================================
@@ -252,6 +273,7 @@
         const app = initializeApp(finalConfig);
         const auth = getAuth(app);
         const db = getDatabase(app);
+        const googleProvider = new GoogleAuthProvider();
 
         let pressureChart = null;
 
@@ -260,6 +282,7 @@
             auth: document.getElementById('authSection'),
             dash: document.getElementById('dashboardSection'),
             loginForm: document.getElementById('loginForm'),
+            googleBtn: document.getElementById('googleBtn'),
             loginError: document.getElementById('loginError'),
             metrics: {
                 turns: document.getElementById('valveTurns'),
@@ -278,9 +301,9 @@
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
                 }
+                // We do NOT call signInAnonymously automatically anymore because
+                // we want the user to actively choose a sign-in method (Email or Google).
             } catch (e) {
                 console.error("Auth initialization failure:", e);
             }
@@ -303,6 +326,7 @@
             setTimeout(() => UI.loading.classList.add('hidden'), 500);
         });
 
+        // Email/Password Login
         UI.loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             UI.loginError.classList.add('hidden');
@@ -315,6 +339,18 @@
             }
         });
 
+        // Google SSO Login
+        UI.googleBtn.addEventListener('click', async () => {
+            UI.loginError.classList.add('hidden');
+            try {
+                await signInWithPopup(auth, googleProvider);
+            } catch (err) {
+                console.error("Google Auth Failed:", err);
+                UI.loginError.innerText = "GOOGLE AUTH FAILED: " + err.message;
+                UI.loginError.classList.remove('hidden');
+            }
+        });
+
         document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
 
         function startTelemetryLink() {
@@ -322,12 +358,6 @@
 
             setInterval(() => { UI.timeLabel.innerText = new Date().toLocaleTimeString(); }, 1000);
 
-            /**
-             * BUG FIX: Sanitize the path.
-             * Firebase Realtime Database paths cannot contain dots (".").
-             * The environment appId often contains dots (e.g., "filename.html").
-             * We replace dots with underscores to satisfy RTDB validation.
-             */
             const sanitizedAppId = appId.replace(/\./g, '_');
             const telemetryPath = typeof __app_id !== 'undefined' 
                 ? `artifacts/${sanitizedAppId}/public/data/${CUSTOM_DATA_PATH}` 
