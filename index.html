@@ -92,7 +92,7 @@
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center">
         <div class="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
-        <p class="mt-4 text-slate-400 font-mono text-xs uppercase tracking-widest">Connecting to Realtime Database...</p>
+        <p class="mt-4 text-slate-400 font-mono text-xs uppercase tracking-widest">Connecting to RTDB Southeast Asia...</p>
     </div>
 
     <!-- Authentication Section -->
@@ -149,7 +149,6 @@
 
         <!-- Main Stats -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <!-- 1. Pressure -->
             <div class="glass p-6 border-l-4 border-l-blue-500">
                 <div class="flex justify-between items-start mb-4">
                     <div class="p-2 bg-blue-500/10 rounded-lg">
@@ -163,7 +162,6 @@
                 </div>
             </div>
 
-            <!-- 2. Valve Turns -->
             <div class="glass p-6 border-l-4 border-l-amber-500">
                 <div class="flex justify-between items-start mb-4">
                     <div class="p-2 bg-amber-500/10 rounded-lg">
@@ -177,7 +175,6 @@
                 </div>
             </div>
 
-            <!-- 3. Timestamp -->
             <div class="glass p-6 border-l-4 border-l-purple-500">
                 <div class="flex justify-between items-start mb-4">
                     <div class="p-2 bg-purple-50 rounded-lg">
@@ -190,7 +187,6 @@
             </div>
         </div>
 
-        <!-- Graph Section -->
         <div class="glass p-6 mb-8">
             <h3 class="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
                 <i class="fas fa-chart-area text-blue-400"></i>
@@ -201,7 +197,6 @@
             </div>
         </div>
 
-        <!-- Detail Table -->
         <div class="glass overflow-hidden">
             <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
                 <h3 class="text-xs font-mono font-bold text-slate-400 uppercase tracking-[0.2em]">Telemetry Event Logs</h3>
@@ -227,20 +222,16 @@
         </div>
     </div>
 
-    <!-- Firebase SDK Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        // IMPORT REALTIME DATABASE
         import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
 
         // ==========================================
-        // 1. ADD YOUR FIREBASE CONFIGURATION HERE
+        // 1. DATABASE CONFIGURATION (Southeast Asia)
         // ==========================================
-        // IMPORTANT: For Realtime Database in Southeast Asia, 
-        // ensure you include the 'databaseURL' field.
         const firebaseConfig = {
-            apiKey:  "AIzaSyA5iaV9POVbeOxz5KlWaAi2Z_rxgvrflbE",
+           apiKey:  "AIzaSyA5iaV9POVbeOxz5KlWaAi2Z_rxgvrflbE",
             authDomain: "project-water-b2dad.firebaseapp.com",
             databaseURL: "https://project-water-b2dad-default-rtdb.asia-southeast1.firebasedatabase.app/",
             projectId: "project-water-b2dad",
@@ -250,12 +241,17 @@
         };
 
         // ==========================================
+        // 2. DATA PATH CONFIGURATION
+        // ==========================================
+        const CUSTOM_DATA_PATH = "telemetry"; 
+        // ==========================================
 
         const finalConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'water-management-v4';
         
         const app = initializeApp(finalConfig);
         const auth = getAuth(app);
-        const db = getDatabase(app); // INITIALIZE REALTIME DATABASE
+        const db = getDatabase(app);
 
         let pressureChart = null;
 
@@ -278,7 +274,6 @@
             timeLabel: document.getElementById('currentTime')
         };
 
-        // Auth Logic
         const initSession = async () => {
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -322,40 +317,48 @@
 
         document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
 
-        // Data Subscription (Realtime Database)
         function startTelemetryLink() {
             if (!auth.currentUser) return;
 
             setInterval(() => { UI.timeLabel.innerText = new Date().toLocaleTimeString(); }, 1000);
 
-            // Change this path to where your data is stored in the Realtime Database JSON tree
-            const telemetryRef = ref(db, 'telemetry');
+            /**
+             * BUG FIX: Sanitize the path.
+             * Firebase Realtime Database paths cannot contain dots (".").
+             * The environment appId often contains dots (e.g., "filename.html").
+             * We replace dots with underscores to satisfy RTDB validation.
+             */
+            const sanitizedAppId = appId.replace(/\./g, '_');
+            const telemetryPath = typeof __app_id !== 'undefined' 
+                ? `artifacts/${sanitizedAppId}/public/data/${CUSTOM_DATA_PATH}` 
+                : CUSTOM_DATA_PATH;
+            
+            const telemetryRef = ref(db, telemetryPath);
 
-            // Listen for changes
             onValue(telemetryRef, (snapshot) => {
                 const data = snapshot.val();
                 if (!data) {
-                    UI.tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-600">No data found in Realtime Database path 'telemetry'</td></tr>`;
+                    UI.tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-600 animate-pulse uppercase tracking-[0.2em] text-[10px]">No data found at: [${telemetryPath}]</td></tr>`;
                     return;
                 }
 
-                // RTDB often stores data as an object. Convert to array.
                 const rawData = Object.keys(data).map(key => {
                     const item = data[key];
                     return {
                         id: key,
                         pressure: Number(item.pressure) || 0,
                         valveTurns: Number(item.valveTurns) || 0,
-                        // Handle Unix timestamp (number) or ISO string
                         timestamp: item.timestamp ? new Date(item.timestamp) : new Date()
                     };
                 });
 
-                // Sort newest first
                 const sortedData = rawData.sort((a, b) => b.timestamp - a.timestamp);
                 updateDisplay(sortedData);
             }, (error) => { 
                 console.error("Database Link Interrupted:", error); 
+                if (error.code === 'PERMISSION_DENIED') {
+                    UI.tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-rose-500 font-mono text-[10px] uppercase tracking-widest">Access Denied: Check rules for [${telemetryPath}]</td></tr>`;
+                }
             });
         }
 
@@ -363,17 +366,14 @@
             if (data.length === 0) return;
             const latest = data[0];
             
-            // Primary Metrics
             UI.metrics.turns.innerText = latest.valveTurns;
             UI.metrics.pressure.innerHTML = `${latest.pressure.toFixed(1)} <span class="text-sm">PSI</span>`;
             UI.metrics.syncTime.innerText = latest.timestamp.toLocaleTimeString();
             UI.metrics.syncDate.innerText = latest.timestamp.toLocaleDateString();
 
-            // Gauges
             UI.metrics.turnsGauge.style.width = `${Math.min((latest.valveTurns / 1000) * 100, 100)}%`;
             UI.metrics.pressureGauge.style.width = `${Math.min((latest.pressure / 150) * 100, 100)}%`;
 
-            // Table Rendering
             UI.logCounter.innerText = `${data.length} PACKETS CACHED`;
             UI.tableBody.innerHTML = data.slice(0, 20).map((log, index) => `
                 <tr class="hover:bg-white/[0.03] transition-colors">
