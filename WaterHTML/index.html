@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industrial Valve Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #f8fafc;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .glass {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+        }
+
+        .auth-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+        }
+
+        .dashboard-container {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .status-pulse {
+            width: 12px;
+            height: 12px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 10px #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+
+        .gauge-bar {
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #38bdf8);
+            width: 0%; 
+            transition: width 1s ease-in-out;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+        }
+
+        #loadingOverlay {
+            background: var(--bg-dark);
+            transition: opacity 0.4s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+        <p class="mt-4 text-slate-400 font-mono text-xs uppercase tracking-widest">Connecting to Realtime Database...</p>
+    </div>
+
+    <!-- Authentication Section -->
+    <div id="authSection" class="auth-container hidden">
+        <div class="glass p-8 w-full max-w-md mx-4">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-500/20 rounded-full mb-4">
+                    <i class="fas fa-droplet text-blue-400 text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold">System Access</h1>
+                <p class="text-slate-400 text-sm">Operator credentials required</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300 font-mono text-[10px] uppercase tracking-wider">Identity UID</label>
+                    <input type="email" id="loginEmail" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-white font-mono text-sm" placeholder="operator@system.io" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300 font-mono text-[10px] uppercase tracking-wider">Access Key</label>
+                    <input type="password" id="loginPass" class="w-full bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-white font-mono text-sm" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-all active:scale-95 uppercase tracking-widest text-xs">
+                    Authorize Connection
+                </button>
+            </form>
+            <div id="loginError" class="mt-4 text-red-400 text-xs font-mono text-center hidden">ERROR: INVALID CREDENTIALS</div>
+        </div>
+    </div>
+
+    <!-- Dashboard Section -->
+    <div id="dashboardSection" class="dashboard-container">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                <h2 class="text-2xl font-bold flex items-center gap-3">
+                    <i class="fas fa-water text-blue-400"></i>
+                    Water Management Terminal
+                </h2>
+                <p class="text-slate-500 flex items-center gap-2 mt-1 font-mono text-xs uppercase tracking-widest">
+                    <span class="status-pulse"></span> Node Status: Live Broadcast
+                </p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="glass px-4 py-2 text-xs font-mono">
+                    <span class="text-slate-500 uppercase tracking-tighter">System:</span>
+                    <span id="currentTime" class="text-blue-300 ml-2">00:00:00</span>
+                </div>
+                <button id="logoutBtn" class="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-800 border border-white/10 text-slate-400 hover:text-white hover:bg-red-500/20 transition-all">
+                    <i class="fas fa-power-off"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- 1. Pressure -->
+            <div class="glass p-6 border-l-4 border-l-blue-500">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-2 bg-blue-500/10 rounded-lg">
+                        <i class="fas fa-gauge-high text-blue-400"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">System Pressure</span>
+                </div>
+                <div class="text-4xl font-mono font-bold mb-1" id="pressureVal">-- <span class="text-lg">PSI</span></div>
+                <div class="mt-4 gauge-bar">
+                    <div id="pressureGauge" class="gauge-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- 2. Valve Turns -->
+            <div class="glass p-6 border-l-4 border-l-amber-500">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-2 bg-amber-500/10 rounded-lg">
+                        <i class="fas fa-sync text-amber-400"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">Valve Turns</span>
+                </div>
+                <div class="text-4xl font-mono font-bold mb-1" id="valveTurns">--</div>
+                <div class="mt-4 gauge-bar">
+                    <div id="turnsGauge" class="gauge-fill bg-amber-500" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- 3. Timestamp -->
+            <div class="glass p-6 border-l-4 border-l-purple-500">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="p-2 bg-purple-50 rounded-lg">
+                        <i class="fas fa-history text-purple-400"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">Last Update</span>
+                </div>
+                <div class="text-xl font-mono font-bold mb-1 mt-1 text-white" id="lastSyncTime">--</div>
+                <div class="text-[10px] font-mono font-bold text-slate-500 uppercase" id="lastSyncDate">--</div>
+            </div>
+        </div>
+
+        <!-- Graph Section -->
+        <div class="glass p-6 mb-8">
+            <h3 class="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <i class="fas fa-chart-area text-blue-400"></i>
+                Pressure Trend (PSI)
+            </h3>
+            <div class="h-64">
+                <canvas id="pressureChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Detail Table -->
+        <div class="glass overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                <h3 class="text-xs font-mono font-bold text-slate-400 uppercase tracking-[0.2em]">Telemetry Event Logs</h3>
+                <div class="text-[10px] font-mono text-blue-400 uppercase" id="logCounter">0 Packets Cached</div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-slate-500 text-[10px] uppercase font-mono tracking-widest border-b border-white/5 bg-slate-900/50">
+                            <th class="px-6 py-4 font-bold">SL NO.</th>
+                            <th class="px-6 py-4 font-bold">Pressure (PSI)</th>
+                            <th class="px-6 py-4 font-bold">Valve Turns</th>
+                            <th class="px-6 py-4 font-bold text-right">Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5 font-mono text-xs" id="logTableBody">
+                        <tr>
+                            <td colspan="4" class="px-6 py-12 text-center text-slate-600 animate-pulse uppercase tracking-[0.3em]">Scouring database for broadcasts...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // IMPORT REALTIME DATABASE
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+
+        // ==========================================
+        // 1. ADD YOUR FIREBASE CONFIGURATION HERE
+        // ==========================================
+        // IMPORTANT: For Realtime Database in Southeast Asia, 
+        // ensure you include the 'databaseURL' field.
+        const firebaseConfig = {
+            apiKey:  "AIzaSyA5iaV9POVbeOxz5KlWaAi2Z_rxgvrflbE",
+            authDomain: "project-water-b2dad.firebaseapp.com",
+            databaseURL: "https://project-water-b2dad-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "project-water-b2dad",
+            storageBucket: "project-water-b2dad.firebasestorage.app",
+            messagingSenderId: "2593146798",
+            appId: "1:2593146798:web:e964319324a7599fa56a3f"
+        };
+
+        // ==========================================
+
+        const finalConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
+        
+        const app = initializeApp(finalConfig);
+        const auth = getAuth(app);
+        const db = getDatabase(app); // INITIALIZE REALTIME DATABASE
+
+        let pressureChart = null;
+
+        const UI = {
+            loading: document.getElementById('loadingOverlay'),
+            auth: document.getElementById('authSection'),
+            dash: document.getElementById('dashboardSection'),
+            loginForm: document.getElementById('loginForm'),
+            loginError: document.getElementById('loginError'),
+            metrics: {
+                turns: document.getElementById('valveTurns'),
+                pressure: document.getElementById('pressureVal'),
+                syncDate: document.getElementById('lastSyncDate'),
+                syncTime: document.getElementById('lastSyncTime'),
+                turnsGauge: document.getElementById('turnsGauge'),
+                pressureGauge: document.getElementById('pressureGauge')
+            },
+            tableBody: document.getElementById('logTableBody'),
+            logCounter: document.getElementById('logCounter'),
+            timeLabel: document.getElementById('currentTime')
+        };
+
+        // Auth Logic
+        const initSession = async () => {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.error("Auth initialization failure:", e);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                UI.auth.classList.add('hidden');
+                UI.dash.style.display = 'block';
+                setTimeout(() => UI.dash.style.opacity = '1', 50);
+                startTelemetryLink();
+            } else {
+                UI.dash.style.opacity = '0';
+                setTimeout(() => { 
+                    UI.dash.style.display = 'none'; 
+                    UI.auth.classList.remove('hidden'); 
+                }, 500);
+            }
+            UI.loading.classList.add('opacity-0');
+            setTimeout(() => UI.loading.classList.add('hidden'), 500);
+        });
+
+        UI.loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            UI.loginError.classList.add('hidden');
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPass').value;
+            try { 
+                await signInWithEmailAndPassword(auth, email, pass); 
+            } catch (err) { 
+                UI.loginError.classList.remove('hidden'); 
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+
+        // Data Subscription (Realtime Database)
+        function startTelemetryLink() {
+            if (!auth.currentUser) return;
+
+            setInterval(() => { UI.timeLabel.innerText = new Date().toLocaleTimeString(); }, 1000);
+
+            // Change this path to where your data is stored in the Realtime Database JSON tree
+            const telemetryRef = ref(db, 'telemetry');
+
+            // Listen for changes
+            onValue(telemetryRef, (snapshot) => {
+                const data = snapshot.val();
+                if (!data) {
+                    UI.tableBody.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-600">No data found in Realtime Database path 'telemetry'</td></tr>`;
+                    return;
+                }
+
+                // RTDB often stores data as an object. Convert to array.
+                const rawData = Object.keys(data).map(key => {
+                    const item = data[key];
+                    return {
+                        id: key,
+                        pressure: Number(item.pressure) || 0,
+                        valveTurns: Number(item.valveTurns) || 0,
+                        // Handle Unix timestamp (number) or ISO string
+                        timestamp: item.timestamp ? new Date(item.timestamp) : new Date()
+                    };
+                });
+
+                // Sort newest first
+                const sortedData = rawData.sort((a, b) => b.timestamp - a.timestamp);
+                updateDisplay(sortedData);
+            }, (error) => { 
+                console.error("Database Link Interrupted:", error); 
+            });
+        }
+
+        function updateDisplay(data) {
+            if (data.length === 0) return;
+            const latest = data[0];
+            
+            // Primary Metrics
+            UI.metrics.turns.innerText = latest.valveTurns;
+            UI.metrics.pressure.innerHTML = `${latest.pressure.toFixed(1)} <span class="text-sm">PSI</span>`;
+            UI.metrics.syncTime.innerText = latest.timestamp.toLocaleTimeString();
+            UI.metrics.syncDate.innerText = latest.timestamp.toLocaleDateString();
+
+            // Gauges
+            UI.metrics.turnsGauge.style.width = `${Math.min((latest.valveTurns / 1000) * 100, 100)}%`;
+            UI.metrics.pressureGauge.style.width = `${Math.min((latest.pressure / 150) * 100, 100)}%`;
+
+            // Table Rendering
+            UI.logCounter.innerText = `${data.length} PACKETS CACHED`;
+            UI.tableBody.innerHTML = data.slice(0, 20).map((log, index) => `
+                <tr class="hover:bg-white/[0.03] transition-colors">
+                    <td class="px-6 py-4 text-slate-500">${data.length - index}</td>
+                    <td class="px-6 py-4 text-blue-400 font-bold">${log.pressure.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-amber-500 font-bold">${log.valveTurns}</td>
+                    <td class="px-6 py-4 text-right text-slate-400 text-[10px]">${log.timestamp.toLocaleString()}</td>
+                </tr>
+            `).join('');
+
+            updateChart(data);
+        }
+
+        function updateChart(data) {
+            const chartCtx = document.getElementById('pressureChart').getContext('2d');
+            const graphData = [...data].reverse().slice(-15);
+            const labels = graphData.map(d => d.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            const pressures = graphData.map(d => d.pressure);
+
+            if (pressureChart) {
+                pressureChart.data.labels = labels;
+                pressureChart.data.datasets[0].data = pressures;
+                pressureChart.update('none');
+            } else {
+                pressureChart = new Chart(chartCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: pressures,
+                            borderColor: '#0ea5e9',
+                            backgroundColor: 'rgba(14, 165, 233, 0.05)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 9, family: 'monospace' } } },
+                            y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#475569', font: { size: 9, family: 'monospace' } } }
+                        }
+                    }
+                });
+            }
+        }
+
+        window.onload = initSession;
+    </script>
+</body>
+</html>
