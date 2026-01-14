@@ -171,7 +171,7 @@
         </div>
 
         <!-- Metrics Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <!-- Pressure -->
             <div class="glass p-6 group">
                 <div class="flex justify-between items-center mb-4">
@@ -185,27 +185,17 @@
             <!-- Turns -->
             <div class="glass p-6 group">
                 <div class="flex justify-between items-center mb-4">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">Actuator Position</span>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">No. of Valve Turns</span>
                     <i class="fas fa-cog text-amber-400 text-sm group-hover:rotate-90 transition-transform"></i>
                 </div>
                 <div class="text-4xl font-mono font-bold" id="valveTurns">0</div>
                 <div class="mt-6 gauge-bar"><div id="turnsGauge" class="gauge-fill bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div></div>
             </div>
 
-            <!-- Piezo -->
-            <div class="glass p-6 group">
-                <div class="flex justify-between items-center mb-4">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">Acoustic Vibration</span>
-                    <i class="fas fa-wave-square text-emerald-400 text-sm group-hover:animate-pulse transition-transform"></i>
-                </div>
-                <div class="text-4xl font-mono font-bold" id="piezoVal">0 <span class="text-sm font-normal text-slate-500 uppercase">Raw</span></div>
-                <div class="mt-6 gauge-bar"><div id="piezoGauge" class="gauge-fill bg-emerald-500"></div></div>
-            </div>
-
-            <!-- Sync -->
+            <!-- Sync (Timestamp) -->
             <div class="glass p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">Last Network Sync</span>
+                    <span class="text-[10px] font-bold text-slate-500 uppercase font-mono tracking-widest">Telemetry Timestamp</span>
                     <i class="fas fa-history text-purple-400 text-sm"></i>
                 </div>
                 <div class="text-xl font-mono font-bold leading-tight" id="lastSyncTime">--:--:--</div>
@@ -271,8 +261,7 @@
         // --- FIREBASE SETUP ---
         const firebaseConfig = {
 
-                            apiKey:  "AIzaSyA5iaV9POVbeOxz5KlWaAi2Z_rxgvrflbE",
-            authDomain: "project-water-b2dad.firebaseapp.com",
+                        authDomain: "project-water-b2dad.firebaseapp.com",
             databaseURL: "https://project-water-b2dad-default-rtdb.asia-southeast1.firebasedatabase.app/",
             projectId: "project-water-b2dad",
             storageBucket: "project-water-b2dad.firebasestorage.app",
@@ -312,12 +301,10 @@
             metrics: {
                 turns: document.getElementById('valveTurns'),
                 pressure: document.getElementById('pressureVal'),
-                piezo: document.getElementById('piezoVal'),
                 syncDate: document.getElementById('lastSyncDate'),
                 syncTime: document.getElementById('lastSyncTime'),
                 turnsGauge: document.getElementById('turnsGauge'),
-                pressureGauge: document.getElementById('pressureGauge'),
-                piezoGauge: document.getElementById('piezoGauge')
+                pressureGauge: document.getElementById('pressureGauge')
             },
             tableBody: document.getElementById('logTableBody'),
             logCounter: document.getElementById('logCounter')
@@ -491,19 +478,12 @@
             // Metrics Update
             UI.metrics.pressure.innerHTML = `${latest.pressure.toFixed(1)} <span class="text-xs font-normal text-slate-500 uppercase">Psi</span>`;
             UI.metrics.turns.innerText = latest.turns;
-            UI.metrics.piezo.innerHTML = `${latest.piezo} <span class="text-xs font-normal text-slate-500 uppercase">Raw</span>`;
             UI.metrics.syncTime.innerText = latest.timestamp.toLocaleTimeString();
             UI.metrics.syncDate.innerText = latest.timestamp.toLocaleDateString();
 
             // Gauges
             UI.metrics.pressureGauge.style.width = `${Math.min((latest.pressure/3000)*100, 100)}%`;
             UI.metrics.turnsGauge.style.width = `${Math.min((Math.abs(latest.turns)/1000)*100, 100)}%`;
-            UI.metrics.piezoGauge.style.width = `${Math.min((latest.piezo/1024)*100, 100)}%`;
-
-            // Smart Color logic for Piezo gauge
-            if (latest.piezo >= PIEZO_CRITICAL) UI.metrics.piezoGauge.className = "gauge-fill bg-rose-500";
-            else if (latest.piezo > PIEZO_WARNING) UI.metrics.piezoGauge.className = "gauge-fill bg-amber-500";
-            else UI.metrics.piezoGauge.className = "gauge-fill bg-emerald-500";
 
             // Diagnostic logic
             const diag = runDiagnostic(latest.pressure, latest.turns, latest.piezo);
