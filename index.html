@@ -183,7 +183,7 @@
                     <span class="text-[10px] font-bold text-slate-500 uppercase font-mono">Pressure Level</span>
                     <i class="fas fa-tachometer-alt text-blue-400 text-xs"></i>
                 </div>
-                <div class="text-3xl font-mono font-bold" id="pressureVal">-- <span class="text-sm font-normal text-slate-500">PSI</span></div>
+                <div class="text-3xl font-mono font-bold" id="pressureVal">-- <span class="text-sm font-normal text-slate-500">Piezo sensor reading</span></div>
                 <div class="mt-4 gauge-bar"><div id="pressureGauge" class="gauge-fill"></div></div>
             </div>
 
@@ -534,7 +534,7 @@
             const latest = buffer[0];
             const deviceInfo = combinedDeviceList.find(d => d.compositeId === selectedCompositeId);
 
-            UI.metrics.pressure.innerHTML = `${latest.pressure.toFixed(1)} <span class="text-sm font-normal text-slate-500">Piezo sesnor readings</span>`;
+            UI.metrics.pressure.innerHTML = `${latest.pressure.toFixed(1)} <span class="text-sm font-normal text-slate-500">Piezo sesnor</span>`;
             UI.metrics.turns.innerText = latest.turns;
             UI.metrics.syncTime.innerText = latest.timestamp.toLocaleTimeString();
             UI.metrics.syncDate.innerText = latest.timestamp.toLocaleDateString();
