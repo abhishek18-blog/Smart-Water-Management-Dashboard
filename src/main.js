@@ -129,7 +129,6 @@ function getCorrectedDateTime(dateString) {
     }
     const dateObj = new Date(safeDate);
     if (isNaN(dateObj.getTime())) return "Invalid Time";
-    // Correction for IST offset if server sends UTC
     const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000); 
     return new Date(fixedTime).toLocaleString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' 
@@ -216,22 +215,20 @@ function refreshView() {
     if (!currentDevice || globalData.length === 0) return;
     const deviceHistory = globalData.filter(d => d.valve_id === currentDevice);
     if (deviceHistory.length > 0) {
-        deviceHistory.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        // Sort oldest to newest for sequence-based compliance logic, then update
+        deviceHistory.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         updateDashboard(deviceHistory);
     }
 }
 
-/**
- * UPDATED: updateDashboard
- * Now correctly maps 'valve_status' and 'turns' directly from your DB schema
- */
 function updateDashboard(historyData) {
-    const latest = historyData[0]; 
+    // Newest log for cards
+    const sortedDesc = [...historyData].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const latest = sortedDesc[0]; 
     const pressure = latest.pressure_val || 0;
-    // Handle potential column name variants (valve_turns or turns)
     const turns = latest.turns !== undefined ? latest.turns : (latest.valve_turns || 0); 
     
-    // 1. Update Pressure Card
+    // 1. Cards Update
     const pEl = document.getElementById('pressureVal');
     let pText = "LOW";
     let pClass = "text-slate-400"; 
@@ -242,28 +239,21 @@ function updateDashboard(historyData) {
     pEl.innerText = pText;
     pEl.className = `text-3xl font-mono font-bold leading-none tracking-wider ${pClass}`;
     
-    // 2. Update Turns Card
     document.getElementById('valveTurns').innerText = turns;
-    
-    // 3. Update Sync Card
     const lastSyncEl = document.getElementById('lastSync');
     lastSyncEl.innerText = getCorrectedDateTime(latest.created_at);
     lastSyncEl.className = "text-xl font-mono font-bold text-white leading-none"; 
     
-    // 4. Update Gauge
     const percentage = Math.min((pressure / 3000) * 100, 100);
     document.getElementById('pressureGauge').style.width = `${percentage}%`;
 
-    // 5. Run Logic & Stats
     runDiagnostics(pressure, turns, latest.valve_status); 
     processDailyStats(historyData);
 
-    // 6. Generate Real-time Table (Updated to show Status and Turns columns)
-    const tableHtml = historyData.slice(0, 15).map(row => {
-        // Color coding logic for the status string
+    // 2. Table Update (Newest first)
+    const tableHtml = sortedDesc.slice(0, 15).map(row => {
         let statusColor = "text-slate-500";
         const statusStr = row.valve_status || "Unknown";
-        
         if (statusStr.includes("HIGH")) statusColor = "text-red-500";
         else if (statusStr.includes("FLOW")) statusColor = "text-tech-success";
         
@@ -317,75 +307,107 @@ function processDailyStats(logs) {
         if (!grouped[dateKey]) grouped[dateKey] = [];
         grouped[dateKey].push(log);
     });
+
     const todayDate = new Date();
-    const y = todayDate.getFullYear();
-    const m = String(todayDate.getMonth()+1).padStart(2,'0');
-    const d = String(todayDate.getDate()).padStart(2,'0');
-    const todayKey = `${y}-${m}-${d}`;
-    const todayLogs = grouped[todayKey] || [];
-    updateComplianceCard(todayLogs);
+    const todayKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth()+1).padStart(2,'0')}-${String(todayDate.getDate()).padStart(2,'0')}`;
+    updateComplianceCard(grouped[todayKey] || []);
+
     const sortedDates = Object.keys(grouped).sort().reverse(); 
     let tableHtml = "";
     sortedDates.slice(0, 5).forEach(date => {
         const dayLogs = grouped[date];
-        dayLogs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
         const stats = calculateDayMetrics(dayLogs);
-        let scoreColor = "text-red-500";
-        if(stats.score >= 80) scoreColor = "text-tech-success";
-        else if(stats.score >= 50) scoreColor = "text-tech-warn";
-        let avgPText = "LOW"; let avgPColor = "text-slate-500";
-        if (stats.avgPressure > 2200) { avgPText = "HIGH"; avgPColor = "text-red-500"; }
-        else if (stats.avgPressure > 800) { avgPText = "NORMAL"; avgPColor = "text-green-500"; }
+        let scoreColor = stats.score >= 80 ? "text-tech-success" : (stats.score >= 50 ? "text-tech-warn" : "text-red-500");
+        let avgPColor = stats.avgPressure > 800 ? "text-green-500" : "text-slate-500";
+
         tableHtml += `<tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
             <td class="p-3 text-white font-bold">${date}</td>
             <td class="p-3 text-right text-slate-400">${stats.startTime}</td>
             <td class="p-3 text-right text-white">${stats.durationStr}</td>
             <td class="p-3 text-center font-bold ${scoreColor}">${stats.score}%</td>
-            <td class="p-3 text-center font-bold ${avgPColor}">${avgPText}</td>
+            <td class="p-3 text-center font-bold ${avgPColor}">${stats.avgPressure > 800 ? 'NORMAL' : 'LOW'}</td>
         </tr>`;
     });
     document.getElementById('dailyStatsBody').innerHTML = tableHtml;
 }
 
+/**
+ * INTEGRATED DIRECTIONAL COMPLIANCE LOGIC
+ * - Starts clock at turns >= 2
+ * - Stops clock when a reverse turn of -2 or more is detected
+ */
 function calculateDayMetrics(dayLogs) {
-    let activeLogs = dayLogs.filter(l => (l.turns || l.valve_turns || 0) > 0);
-    if(activeLogs.length === 0) return { startTime: "--:--", durationStr: "0m", score: 0, ghostFlow: false, avgPressure: 0 };
-    const startObj = getCorrectedDateObject(activeLogs[0].created_at);
-    const startTimeStr = startObj.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: true});
-    const firstOpen = new Date(activeLogs[0].created_at);
-    const lastOpen = new Date(activeLogs[activeLogs.length - 1].created_at);
-    const durationMs = lastOpen - firstOpen;
+    if (!dayLogs || dayLogs.length === 0) return { startTime: "--:--", durationStr: "0m", score: 0, avgPressure: 0 };
+
+    // Sort chronologically to detect movement sequence
+    const sorted = [...dayLogs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    let sessionStart = null;
+    let sessionEnd = null;
+    let activeSessionLogs = [];
+    let isCurrentlyActive = false;
+
+    for (let i = 0; i < sorted.length; i++) {
+        const current = sorted[i];
+        const prev = i > 0 ? sorted[i - 1] : null;
+        
+        const currentT = current.turns !== undefined ? current.turns : (current.valve_turns || 0);
+        const prevT = prev ? (prev.turns !== undefined ? prev.turns : (prev.valve_turns || 0)) : 0;
+
+        // 1. DETECT OPEN (+2 or more)
+        if (!isCurrentlyActive && currentT >= 2) {
+            isCurrentlyActive = true;
+            sessionStart = new Date(current.created_at);
+        }
+
+        // 2. DETECT CLOSE (Drop of 2 or more from previous)
+        if (isCurrentlyActive && prev && (prevT - currentT >= 2)) {
+            isCurrentlyActive = false;
+            // The flow effectively ended at the timestamp BEFORE this drop
+            sessionEnd = new Date(prev.created_at);
+        }
+
+        // Accumulate data for averages/duration while active
+        if (isCurrentlyActive) {
+            activeSessionLogs.push(current);
+            sessionEnd = new Date(current.created_at); // Continuously update end point
+        }
+    }
+
+    if (!sessionStart || !sessionEnd) {
+        return { startTime: "--:--", durationStr: "0m", score: 0, avgPressure: 0 };
+    }
+
+    const durationMs = sessionEnd - sessionStart;
     const durationMin = Math.max(Math.floor(durationMs / 60000), 1);
-    const durationHrs = Math.floor(durationMin / 60);
-    const durationRemMin = durationMin % 60;
-    const hour = startObj.getHours(); const min = startObj.getMinutes();
-    let timeScore = 0;
-    if (hour === 4 || (hour === 3 && min >= 45) || (hour === 4 && min <= 15)) { timeScore = 50; } 
-    else if (hour === 3 || hour === 5) { timeScore = 20; }
-    let durationScore = Math.min((durationMin / 120) * 50, 50); 
-    const totalScore = Math.floor(timeScore + durationScore);
-    const ghostFlow = activeLogs.some(l => (l.pressure_val || 0) < 10);
-    const avgP = Math.floor(activeLogs.reduce((a, b) => a + (b.pressure_val||0), 0) / activeLogs.length);
-    return { startTime: startTimeStr, durationStr: `${durationHrs}h ${durationRemMin}m`, score: totalScore, ghostFlow: ghostFlow, avgPressure: avgP };
+    const avgP = activeSessionLogs.length > 0 
+        ? Math.floor(activeSessionLogs.reduce((acc, l) => acc + (l.pressure_val || 0), 0) / activeSessionLogs.length)
+        : 0;
+
+    return { 
+        startTime: sessionStart.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        durationStr: `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`, 
+        score: Math.min(Math.floor((durationMin / 120) * 100), 100), 
+        avgPressure: avgP 
+    };
 }
 
 function updateComplianceCard(todayLogs) {
-    todayLogs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
     const metrics = calculateDayMetrics(todayLogs);
     document.getElementById('complianceScore').innerText = metrics.score + "%";
     document.getElementById('startTimeDisplay').innerText = metrics.startTime;
     document.getElementById('durationDisplay').innerText = metrics.durationStr;
+    
     const avgDisplay = document.getElementById('avgPressureDisplay');
-    let avgText = "LOW"; let avgClass = "text-slate-400 font-bold";
-    if (metrics.avgPressure > 2200) { avgText = "HIGH"; avgClass = "text-tech-alert font-bold"; } 
-    else if (metrics.avgPressure > 800) { avgText = "NORMAL"; avgClass = "text-tech-success font-bold"; }
-    avgDisplay.innerText = avgText; avgDisplay.className = avgClass;
+    avgDisplay.innerText = metrics.avgPressure > 0 ? `${metrics.avgPressure} PSI` : "--";
+    avgDisplay.className = metrics.avgPressure > 800 ? "text-tech-success font-bold" : "text-slate-400 font-bold";
+    
     const ring = document.getElementById('complianceRing');
-    let color = "#ef4444"; let statusText = "NON-COMPLIANT"; let statusClass = "text-[10px] font-bold text-red-500 uppercase mt-1";
-    if (metrics.score >= 80) { color = "#10b981"; statusText = "SCHEDULE ADHERED"; statusClass = "text-[10px] font-bold text-tech-success uppercase mt-1"; }
-    else if (metrics.score >= 50) { color = "#fbbf24"; statusText = "PARTIAL ADHERENCE"; statusClass = "text-[10px] font-bold text-tech-warn uppercase mt-1"; }
+    let color = metrics.score >= 80 ? "#10b981" : (metrics.score >= 50 ? "#fbbf24" : "#ef4444");
     ring.style.setProperty('--score-color', color);
     ring.style.setProperty('--score-deg', `${(metrics.score / 100) * 360}deg`);
+    
     const statusEl = document.getElementById('scheduleStatus');
-    statusEl.innerText = statusText; statusEl.className = statusClass;
+    statusEl.innerText = metrics.score >= 80 ? "SCHEDULE ADHERED" : (metrics.score >= 50 ? "PARTIAL ADHERENCE" : "NON-COMPLIANT");
+    statusEl.className = `text-[10px] font-bold uppercase mt-1 ${metrics.score >= 80 ? 'text-tech-success' : 'text-red-500'}`;
 }
