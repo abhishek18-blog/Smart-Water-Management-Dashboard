@@ -12,6 +12,7 @@ const authError = document.getElementById('authError');
 const btnLogin = document.getElementById('btnLogin');
 const btnRegister = document.getElementById('btnRegister');
 
+// Helper to toggle loading state
 function setAuthLoading(isLoading) {
     const btns = [btnLogin, btnRegister];
     btns.forEach(btn => {
@@ -28,6 +29,7 @@ function setAuthLoading(isLoading) {
     });
 }
 
+// Watch for login status
 onAuthStateChanged(auth, (user) => {
     if (user) {
         authSection.classList.add('hidden');
@@ -44,6 +46,7 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
+// Login Button
 btnLogin.addEventListener('click', async () => {
     setAuthLoading(true);
     try {
@@ -57,23 +60,28 @@ btnLogin.addEventListener('click', async () => {
     }
 });
 
+// Register Button
 btnRegister.addEventListener('click', async () => {
     const email = emailInput.value;
     const password = passInput.value;
+
     if (!email.includes('@')) {
         authError.innerText = "Error: Please use a valid email format (e.g., op@valve.com)";
         authError.classList.remove('hidden');
         return;
     }
+
     if (password.length < 6) {
         authError.innerText = "Error: Passcode must be at least 6 characters.";
         authError.classList.remove('hidden');
         return;
     }
+
     setAuthLoading(true);
     try {
         await createUserWithEmailAndPassword(auth, email, password);
         authError.classList.add('hidden');
+        console.log("New ID Created Successfully");
     } catch (error) {
         authError.innerText = "Registration Failed: " + error.message;
         authError.classList.remove('hidden');
@@ -82,9 +90,11 @@ btnRegister.addEventListener('click', async () => {
     }
 });
 
+// Logout Button
 document.getElementById('btnLogout').addEventListener('click', () => {
     signOut(auth);
 });
+
 
 // --- 3. DASHBOARD LOGIC (IST Corrected) ---
 let API_URL = ""; 
@@ -99,8 +109,10 @@ function enterDashboard() {
         console.warn("No API Endpoint set");
         return; 
     }
+    
     API_URL = inputUrl.replace(/\/$/, ""); 
     startLiveClock();
+    
     if (fetchInterval) clearInterval(fetchInterval);
     fetchData();
     fetchInterval = setInterval(fetchData, 2000); 
@@ -111,8 +123,13 @@ function enterDashboard() {
 
 function getCorrectedDateTime(dateString) {
     if (!dateString) return "--/-- --:--";
-    let safeDate = dateString.replace(" ", "T"); 
+    let safeDate = dateString;
+    if (typeof dateString === 'string' && !dateString.includes('T') && !dateString.includes('Z')) {
+        safeDate = dateString.replace(" ", "T"); 
+    }
     const dateObj = new Date(safeDate);
+    if (isNaN(dateObj.getTime())) return "Invalid Time";
+    // Correction for IST offset if server sends UTC
     const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000); 
     return new Date(fixedTime).toLocaleString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' 
@@ -120,10 +137,12 @@ function getCorrectedDateTime(dateString) {
 }
 
 function getCorrectedDateObject(dateString) {
-    let safeDate = dateString.replace(" ", "T");
+    let safeDate = dateString;
+    if (typeof dateString === 'string') safeDate = dateString.replace(" ", "T");
     const dateObj = new Date(safeDate);
     if (isNaN(dateObj.getTime())) return new Date(); 
-    return new Date(dateObj.getTime() - (5.5 * 60 * 60 * 1000));
+    const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000);
+    return new Date(fixedTime);
 }
 
 function startLiveClock() {
@@ -143,15 +162,30 @@ async function fetchData() {
         const response = await fetch(`${API_URL}/api/history`, {
             headers: { "ngrok-skip-browser-warning": "true", "Content-Type": "application/json" }
         });
-        globalData = await response.json();
+        if (!response.ok) throw new Error("Server Offline: " + response.status);
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+            globalData = await response.json();
+        } else {
+            throw new Error("Invalid Data Format");
+        }
+        
         if(globalData.length > 0) {
             updateDeviceList(globalData);
             refreshView();
+            const diagText = document.getElementById('diagStatus');
+            if (diagText && diagText.innerText === "CONNECTION FAILURE") {
+                document.getElementById('diagnosticPanel').style.borderLeftColor = "#00f2ff";
+            }
         }
     } catch (error) {
         console.error("Connection Error:", error);
         const diagText = document.getElementById('diagStatus');
-        if(diagText) diagText.innerText = "CONNECTION FAILURE";
+        if(diagText) {
+            diagText.innerText = "CONNECTION FAILURE";
+            diagText.style.color = "#ff2a2a";
+            document.getElementById('diagnosticPanel').style.borderLeftColor = "#ff2a2a";
+        }
     }
 }
 
@@ -160,13 +194,21 @@ function updateDeviceList(data) {
     if (JSON.stringify(foundDevices.sort()) !== JSON.stringify(uniqueDevices.sort())) {
         uniqueDevices = foundDevices;
         const select = document.getElementById('deviceSelect');
+        const savedSelection = select.value;
         select.innerHTML = uniqueDevices.map(id => `<option value="${id}">${id}</option>`).join('');
-        if (!currentDevice) { currentDevice = uniqueDevices[0]; select.value = currentDevice; }
+        if (savedSelection && uniqueDevices.includes(savedSelection)) {
+            select.value = savedSelection;
+            if(currentDevice !== savedSelection) currentDevice = savedSelection;
+        } else if (uniqueDevices.length > 0) {
+            select.value = uniqueDevices[0];
+            currentDevice = uniqueDevices[0];
+        }
     }
 }
 
 function handleDeviceChange() {
-    currentDevice = document.getElementById('deviceSelect').value;
+    const select = document.getElementById('deviceSelect');
+    currentDevice = select.value;
     refreshView();
 }
 
@@ -174,154 +216,176 @@ function refreshView() {
     if (!currentDevice || globalData.length === 0) return;
     const deviceHistory = globalData.filter(d => d.valve_id === currentDevice);
     if (deviceHistory.length > 0) {
-        deviceHistory.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        deviceHistory.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         updateDashboard(deviceHistory);
     }
 }
 
+/**
+ * UPDATED: updateDashboard
+ * Now correctly maps 'valve_status' and 'turns' directly from your DB schema
+ */
 function updateDashboard(historyData) {
-    const sortedDesc = [...historyData].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const latest = sortedDesc[0]; 
+    const latest = historyData[0]; 
     const pressure = latest.pressure_val || 0;
+    // Handle potential column name variants (valve_turns or turns)
     const turns = latest.turns !== undefined ? latest.turns : (latest.valve_turns || 0); 
     
-    document.getElementById('pressureVal').innerText = pressure > 800 ? "NORMAL" : "LOW";
+    // 1. Update Pressure Card
+    const pEl = document.getElementById('pressureVal');
+    let pText = "LOW";
+    let pClass = "text-slate-400"; 
+    if (pressure > 2200) { pText = "HIGH"; pClass = "text-tech-alert"; } 
+    else if (pressure > 800) { pText = "NORMAL"; pClass = "text-tech-success"; } 
+    else { pText = "LOW"; pClass = (turns > 0) ? "text-tech-warn" : "text-slate-400"; }
+    
+    pEl.innerText = pText;
+    pEl.className = `text-3xl font-mono font-bold leading-none tracking-wider ${pClass}`;
+    
+    // 2. Update Turns Card
     document.getElementById('valveTurns').innerText = turns;
-    document.getElementById('lastSync').innerText = getCorrectedDateTime(latest.created_at);
-    document.getElementById('pressureGauge').style.width = `${Math.min((pressure / 3000) * 100, 100)}%`;
+    
+    // 3. Update Sync Card
+    const lastSyncEl = document.getElementById('lastSync');
+    lastSyncEl.innerText = getCorrectedDateTime(latest.created_at);
+    lastSyncEl.className = "text-xl font-mono font-bold text-white leading-none"; 
+    
+    // 4. Update Gauge
+    const percentage = Math.min((pressure / 3000) * 100, 100);
+    document.getElementById('pressureGauge').style.width = `${percentage}%`;
 
+    // 5. Run Logic & Stats
     runDiagnostics(pressure, turns, latest.valve_status); 
     processDailyStats(historyData);
 
-    const tableHtml = sortedDesc.slice(0, 15).map(row => `
-        <tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
+    // 6. Generate Real-time Table (Updated to show Status and Turns columns)
+    const tableHtml = historyData.slice(0, 15).map(row => {
+        // Color coding logic for the status string
+        let statusColor = "text-slate-500";
+        const statusStr = row.valve_status || "Unknown";
+        
+        if (statusStr.includes("HIGH")) statusColor = "text-red-500";
+        else if (statusStr.includes("FLOW")) statusColor = "text-tech-success";
+        
+        const rowTurns = row.turns !== undefined ? row.turns : (row.valve_turns || 0);
+
+        return `<tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
             <td class="p-3 text-slate-500 text-[10px] font-mono">${getCorrectedDateTime(row.created_at)}</td>
             <td class="p-3 text-white font-medium">ID:${row.valve_id.slice(-5)}</td>
-            <td class="p-3 text-right font-bold uppercase text-[10px] text-tech-cyan">${row.valve_status || "Unknown"}</td>
-            <td class="p-3 text-right text-amber-400 font-bold font-mono">${row.turns || 0} TRN</td>
-        </tr>`).join('');
+            <td class="p-3 text-right ${statusColor} font-bold uppercase text-[10px]">${statusStr}</td>
+            <td class="p-3 text-right text-amber-400 font-bold font-mono">
+                ${rowTurns} <span class="text-[8px] text-slate-600">TRN</span>
+            </td>
+        </tr>`
+    }).join('');
     
     document.getElementById('logTableBody').innerHTML = tableHtml;
 }
 
 function runDiagnostics(pressure, turns, status) {
     let msg = "SYSTEM NOMINAL"; let color = "#00f2ff"; let icon = "fa-check-circle";
+    const diagSub = document.getElementById('diagSubStatus');
     if (turns > 0 && pressure < 10) {
         msg = "GHOST FLOW DETECTED"; color = "#ff2a2a"; icon = "fa-burst";
+        diagSub.classList.remove('hidden'); diagSub.innerText = "CRITICAL: Valve Open but Flow is Zero";
+    } else if (pressure > 2500) {
+        msg = "WARNING: HIGH PRESSURE"; color = "#fbbf24"; icon = "fa-exclamation-triangle";
+        diagSub.classList.add('hidden');
+    } else if (turns > 0 && pressure <= 800) {
+        msg = "LOW PRESSURE WARNING"; color = "#fbbf24"; icon = "fa-arrow-down";
+        diagSub.classList.remove('hidden'); diagSub.innerText = "Flow detected but pressure is suboptimal";
+    } else {
+        diagSub.classList.add('hidden');
     }
     const diagText = document.getElementById('diagStatus');
+    const diagPanel = document.getElementById('diagnosticPanel');
     const iconBox = document.getElementById('diagIconBox');
-    diagText.innerText = msg; diagText.style.color = color;
-    document.getElementById('diagnosticPanel').style.borderLeftColor = color;
-    if(iconBox) iconBox.innerHTML = `<i class="fas ${icon}"></i>`;
+    diagText.innerText = msg; diagText.style.color = color; diagText.style.textShadow = `0 0 10px ${color}55`;
+    diagPanel.style.borderLeftColor = color;
+    iconBox.style.color = color; iconBox.style.borderColor = color;
+    iconBox.innerHTML = `<i class="fas ${icon}"></i>`;
 }
 
 function processDailyStats(logs) {
     const grouped = {};
     logs.forEach(log => {
         const correctedDate = getCorrectedDateObject(log.created_at);
-        const dateKey = `${correctedDate.getFullYear()}-${String(correctedDate.getMonth()+1).padStart(2,'0')}-${String(correctedDate.getDate()).padStart(2,'0')}`;
+        const y = correctedDate.getFullYear();
+        const m = String(correctedDate.getMonth()+1).padStart(2,'0');
+        const d = String(correctedDate.getDate()).padStart(2,'0');
+        const dateKey = `${y}-${m}-${d}`;
         if (!grouped[dateKey]) grouped[dateKey] = [];
         grouped[dateKey].push(log);
     });
-
-    const now = new Date();
-    const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-    updateComplianceCard(grouped[todayKey] || []);
-
+    const todayDate = new Date();
+    const y = todayDate.getFullYear();
+    const m = String(todayDate.getMonth()+1).padStart(2,'0');
+    const d = String(todayDate.getDate()).padStart(2,'0');
+    const todayKey = `${y}-${m}-${d}`;
+    const todayLogs = grouped[todayKey] || [];
+    updateComplianceCard(todayLogs);
     const sortedDates = Object.keys(grouped).sort().reverse(); 
     let tableHtml = "";
     sortedDates.slice(0, 5).forEach(date => {
-        const stats = calculateDayMetrics(grouped[date]);
-        let scoreColor = stats.score >= 80 ? "text-tech-success" : (stats.score >= 50 ? "text-tech-warn" : "text-red-500");
+        const dayLogs = grouped[date];
+        dayLogs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+        const stats = calculateDayMetrics(dayLogs);
+        let scoreColor = "text-red-500";
+        if(stats.score >= 80) scoreColor = "text-tech-success";
+        else if(stats.score >= 50) scoreColor = "text-tech-warn";
+        let avgPText = "LOW"; let avgPColor = "text-slate-500";
+        if (stats.avgPressure > 2200) { avgPText = "HIGH"; avgPColor = "text-red-500"; }
+        else if (stats.avgPressure > 800) { avgPText = "NORMAL"; avgPColor = "text-green-500"; }
         tableHtml += `<tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
             <td class="p-3 text-white font-bold">${date}</td>
             <td class="p-3 text-right text-slate-400">${stats.startTime}</td>
             <td class="p-3 text-right text-white">${stats.durationStr}</td>
             <td class="p-3 text-center font-bold ${scoreColor}">${stats.score}%</td>
-            <td class="p-3 text-center font-bold text-slate-500">${stats.avgPressure > 0 ? stats.avgPressure + ' PSI' : '--'}</td>
+            <td class="p-3 text-center font-bold ${avgPColor}">${avgPText}</td>
         </tr>`;
     });
     document.getElementById('dailyStatsBody').innerHTML = tableHtml;
 }
 
-/**
- * INTEGRATED DELTA COMPLIANCE LOGIC
- * - Starts clock at turns >= 2
- * - Stops clock when drop (prev - current) >= 2 OR current hits 0
- */
 function calculateDayMetrics(dayLogs) {
-    if (!dayLogs || dayLogs.length === 0) return { startTime: "--:--", durationStr: "0m", score: 0, avgPressure: 0 };
-
-    const sorted = [...dayLogs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-    let sessionStart = null;
-    let sessionEnd = null;
-    let activeSessionLogs = [];
-    let isCurrentlyActive = false;
-
-    for (let i = 0; i < sorted.length; i++) {
-        const current = sorted[i];
-        const prev = i > 0 ? sorted[i - 1] : null;
-        
-        const currentT = current.turns !== undefined ? current.turns : (current.valve_turns || 0);
-        const prevT = prev ? (prev.turns !== undefined ? prev.turns : (prev.valve_turns || 0)) : 0;
-
-        // 1. OPEN LOGIC (>= 2 turns)
-        if (!isCurrentlyActive && currentT >= 2) {
-            isCurrentlyActive = true;
-            sessionStart = new Date(current.created_at);
-        }
-
-        // 2. CLOSE LOGIC (Drop of 2+ units OR hitting 0)
-        if (isCurrentlyActive && prev) {
-            const dropDelta = prevT - currentT;
-            if (dropDelta >= 2 || currentT === 0) {
-                isCurrentlyActive = false;
-                sessionEnd = new Date(prev.created_at); // Clock stops at last valid operational reading
-            }
-        }
-
-        if (isCurrentlyActive) {
-            activeSessionLogs.push(current);
-            sessionEnd = new Date(current.created_at); 
-        }
-    }
-
-    if (!sessionStart || !sessionEnd) {
-        return { startTime: "--:--", durationStr: "0m", score: 0, avgPressure: 0 };
-    }
-
-    const durationMs = sessionEnd - sessionStart;
+    let activeLogs = dayLogs.filter(l => (l.turns || l.valve_turns || 0) > 0);
+    if(activeLogs.length === 0) return { startTime: "--:--", durationStr: "0m", score: 0, ghostFlow: false, avgPressure: 0 };
+    const startObj = getCorrectedDateObject(activeLogs[0].created_at);
+    const startTimeStr = startObj.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: true});
+    const firstOpen = new Date(activeLogs[0].created_at);
+    const lastOpen = new Date(activeLogs[activeLogs.length - 1].created_at);
+    const durationMs = lastOpen - firstOpen;
     const durationMin = Math.max(Math.floor(durationMs / 60000), 1);
-    const avgP = activeSessionLogs.length > 0 
-        ? Math.floor(activeSessionLogs.reduce((acc, l) => acc + (l.pressure_val || 0), 0) / activeSessionLogs.length)
-        : 0;
-
-    return { 
-        startTime: sessionStart.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-        durationStr: `${Math.floor(durationMin / 60)}h ${durationMin % 60}m`, 
-        score: Math.min(Math.floor((durationMin / 120) * 100), 100), 
-        avgPressure: avgP 
-    };
+    const durationHrs = Math.floor(durationMin / 60);
+    const durationRemMin = durationMin % 60;
+    const hour = startObj.getHours(); const min = startObj.getMinutes();
+    let timeScore = 0;
+    if (hour === 4 || (hour === 3 && min >= 45) || (hour === 4 && min <= 15)) { timeScore = 50; } 
+    else if (hour === 3 || hour === 5) { timeScore = 20; }
+    let durationScore = Math.min((durationMin / 120) * 50, 50); 
+    const totalScore = Math.floor(timeScore + durationScore);
+    const ghostFlow = activeLogs.some(l => (l.pressure_val || 0) < 10);
+    const avgP = Math.floor(activeLogs.reduce((a, b) => a + (b.pressure_val||0), 0) / activeLogs.length);
+    return { startTime: startTimeStr, durationStr: `${durationHrs}h ${durationRemMin}m`, score: totalScore, ghostFlow: ghostFlow, avgPressure: avgP };
 }
 
 function updateComplianceCard(todayLogs) {
+    todayLogs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
     const metrics = calculateDayMetrics(todayLogs);
     document.getElementById('complianceScore').innerText = metrics.score + "%";
     document.getElementById('startTimeDisplay').innerText = metrics.startTime;
     document.getElementById('durationDisplay').innerText = metrics.durationStr;
-    
     const avgDisplay = document.getElementById('avgPressureDisplay');
-    avgDisplay.innerText = metrics.avgPressure > 0 ? `${metrics.avgPressure} PSI` : "--";
-    avgDisplay.className = metrics.avgPressure > 800 ? "text-tech-success font-bold" : "text-slate-400 font-bold";
-    
+    let avgText = "LOW"; let avgClass = "text-slate-400 font-bold";
+    if (metrics.avgPressure > 2200) { avgText = "HIGH"; avgClass = "text-tech-alert font-bold"; } 
+    else if (metrics.avgPressure > 800) { avgText = "NORMAL"; avgClass = "text-tech-success font-bold"; }
+    avgDisplay.innerText = avgText; avgDisplay.className = avgClass;
     const ring = document.getElementById('complianceRing');
-    let color = metrics.score >= 80 ? "#10b981" : (metrics.score >= 50 ? "#fbbf24" : "#ef4444");
+    let color = "#ef4444"; let statusText = "NON-COMPLIANT"; let statusClass = "text-[10px] font-bold text-red-500 uppercase mt-1";
+    if (metrics.score >= 80) { color = "#10b981"; statusText = "SCHEDULE ADHERED"; statusClass = "text-[10px] font-bold text-tech-success uppercase mt-1"; }
+    else if (metrics.score >= 50) { color = "#fbbf24"; statusText = "PARTIAL ADHERENCE"; statusClass = "text-[10px] font-bold text-tech-warn uppercase mt-1"; }
     ring.style.setProperty('--score-color', color);
     ring.style.setProperty('--score-deg', `${(metrics.score / 100) * 360}deg`);
-    
     const statusEl = document.getElementById('scheduleStatus');
-    statusEl.innerText = metrics.score >= 80 ? "SCHEDULE ADHERED" : (metrics.score >= 50 ? "PARTIAL ADHERENCE" : "NON-COMPLIANT");
-    statusEl.className = `text-[10px] font-bold uppercase mt-1 ${metrics.score >= 80 ? 'text-tech-success' : 'text-red-500'}`;
+    statusEl.innerText = statusText; statusEl.className = statusClass;
 }
