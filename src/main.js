@@ -12,7 +12,6 @@ const authError = document.getElementById('authError');
 const btnLogin = document.getElementById('btnLogin');
 const btnRegister = document.getElementById('btnRegister');
 
-// Helper to toggle loading state
 function setAuthLoading(isLoading) {
     const btns = [btnLogin, btnRegister];
     btns.forEach(btn => {
@@ -29,7 +28,6 @@ function setAuthLoading(isLoading) {
     });
 }
 
-// Watch for login status
 onAuthStateChanged(auth, (user) => {
     if (user) {
         authSection.classList.add('hidden');
@@ -46,7 +44,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// Login Button
 btnLogin.addEventListener('click', async () => {
     setAuthLoading(true);
     try {
@@ -60,28 +57,23 @@ btnLogin.addEventListener('click', async () => {
     }
 });
 
-// Register Button
 btnRegister.addEventListener('click', async () => {
     const email = emailInput.value;
     const password = passInput.value;
-
     if (!email.includes('@')) {
         authError.innerText = "Error: Please use a valid email format (e.g., op@valve.com)";
         authError.classList.remove('hidden');
         return;
     }
-
     if (password.length < 6) {
         authError.innerText = "Error: Passcode must be at least 6 characters.";
         authError.classList.remove('hidden');
         return;
     }
-
     setAuthLoading(true);
     try {
         await createUserWithEmailAndPassword(auth, email, password);
         authError.classList.add('hidden');
-        console.log("New ID Created Successfully");
     } catch (error) {
         authError.innerText = "Registration Failed: " + error.message;
         authError.classList.remove('hidden');
@@ -90,11 +82,9 @@ btnRegister.addEventListener('click', async () => {
     }
 });
 
-// Logout Button
 document.getElementById('btnLogout').addEventListener('click', () => {
     signOut(auth);
 });
-
 
 // --- 3. DASHBOARD LOGIC (IST Corrected) ---
 let API_URL = ""; 
@@ -109,10 +99,8 @@ function enterDashboard() {
         console.warn("No API Endpoint set");
         return; 
     }
-    
     API_URL = inputUrl.replace(/\/$/, ""); 
     startLiveClock();
-    
     if (fetchInterval) clearInterval(fetchInterval);
     fetchData();
     fetchInterval = setInterval(fetchData, 2000); 
@@ -123,12 +111,8 @@ function enterDashboard() {
 
 function getCorrectedDateTime(dateString) {
     if (!dateString) return "--/-- --:--";
-    let safeDate = dateString;
-    if (typeof dateString === 'string' && !dateString.includes('T') && !dateString.includes('Z')) {
-        safeDate = dateString.replace(" ", "T"); 
-    }
+    let safeDate = dateString.replace(" ", "T"); 
     const dateObj = new Date(safeDate);
-    if (isNaN(dateObj.getTime())) return "Invalid Time";
     const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000); 
     return new Date(fixedTime).toLocaleString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' 
@@ -136,12 +120,10 @@ function getCorrectedDateTime(dateString) {
 }
 
 function getCorrectedDateObject(dateString) {
-    let safeDate = dateString;
-    if (typeof dateString === 'string') safeDate = dateString.replace(" ", "T");
+    let safeDate = dateString.replace(" ", "T");
     const dateObj = new Date(safeDate);
     if (isNaN(dateObj.getTime())) return new Date(); 
-    const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000);
-    return new Date(fixedTime);
+    return new Date(dateObj.getTime() - (5.5 * 60 * 60 * 1000));
 }
 
 function startLiveClock() {
@@ -161,30 +143,15 @@ async function fetchData() {
         const response = await fetch(`${API_URL}/api/history`, {
             headers: { "ngrok-skip-browser-warning": "true", "Content-Type": "application/json" }
         });
-        if (!response.ok) throw new Error("Server Offline: " + response.status);
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-            globalData = await response.json();
-        } else {
-            throw new Error("Invalid Data Format");
-        }
-        
+        globalData = await response.json();
         if(globalData.length > 0) {
             updateDeviceList(globalData);
             refreshView();
-            const diagText = document.getElementById('diagStatus');
-            if (diagText && diagText.innerText === "CONNECTION FAILURE") {
-                document.getElementById('diagnosticPanel').style.borderLeftColor = "#00f2ff";
-            }
         }
     } catch (error) {
         console.error("Connection Error:", error);
         const diagText = document.getElementById('diagStatus');
-        if(diagText) {
-            diagText.innerText = "CONNECTION FAILURE";
-            diagText.style.color = "#ff2a2a";
-            document.getElementById('diagnosticPanel').style.borderLeftColor = "#ff2a2a";
-        }
+        if(diagText) diagText.innerText = "CONNECTION FAILURE";
     }
 }
 
@@ -193,21 +160,13 @@ function updateDeviceList(data) {
     if (JSON.stringify(foundDevices.sort()) !== JSON.stringify(uniqueDevices.sort())) {
         uniqueDevices = foundDevices;
         const select = document.getElementById('deviceSelect');
-        const savedSelection = select.value;
         select.innerHTML = uniqueDevices.map(id => `<option value="${id}">${id}</option>`).join('');
-        if (savedSelection && uniqueDevices.includes(savedSelection)) {
-            select.value = savedSelection;
-            if(currentDevice !== savedSelection) currentDevice = savedSelection;
-        } else if (uniqueDevices.length > 0) {
-            select.value = uniqueDevices[0];
-            currentDevice = uniqueDevices[0];
-        }
+        if (!currentDevice) { currentDevice = uniqueDevices[0]; select.value = currentDevice; }
     }
 }
 
 function handleDeviceChange() {
-    const select = document.getElementById('deviceSelect');
-    currentDevice = select.value;
+    currentDevice = document.getElementById('deviceSelect').value;
     refreshView();
 }
 
@@ -215,131 +174,85 @@ function refreshView() {
     if (!currentDevice || globalData.length === 0) return;
     const deviceHistory = globalData.filter(d => d.valve_id === currentDevice);
     if (deviceHistory.length > 0) {
-        // Sort oldest to newest for sequence-based compliance logic, then update
         deviceHistory.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
         updateDashboard(deviceHistory);
     }
 }
 
 function updateDashboard(historyData) {
-    // Newest log for cards
     const sortedDesc = [...historyData].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     const latest = sortedDesc[0]; 
     const pressure = latest.pressure_val || 0;
     const turns = latest.turns !== undefined ? latest.turns : (latest.valve_turns || 0); 
     
-    // 1. Cards Update
-    const pEl = document.getElementById('pressureVal');
-    let pText = "LOW";
-    let pClass = "text-slate-400"; 
-    if (pressure > 2200) { pText = "HIGH"; pClass = "text-tech-alert"; } 
-    else if (pressure > 800) { pText = "NORMAL"; pClass = "text-tech-success"; } 
-    else { pText = "LOW"; pClass = (turns > 0) ? "text-tech-warn" : "text-slate-400"; }
-    
-    pEl.innerText = pText;
-    pEl.className = `text-3xl font-mono font-bold leading-none tracking-wider ${pClass}`;
-    
+    document.getElementById('pressureVal').innerText = pressure > 800 ? "NORMAL" : "LOW";
     document.getElementById('valveTurns').innerText = turns;
-    const lastSyncEl = document.getElementById('lastSync');
-    lastSyncEl.innerText = getCorrectedDateTime(latest.created_at);
-    lastSyncEl.className = "text-xl font-mono font-bold text-white leading-none"; 
-    
-    const percentage = Math.min((pressure / 3000) * 100, 100);
-    document.getElementById('pressureGauge').style.width = `${percentage}%`;
+    document.getElementById('lastSync').innerText = getCorrectedDateTime(latest.created_at);
+    document.getElementById('pressureGauge').style.width = `${Math.min((pressure / 3000) * 100, 100)}%`;
 
     runDiagnostics(pressure, turns, latest.valve_status); 
     processDailyStats(historyData);
 
-    // 2. Table Update (Newest first)
-    const tableHtml = sortedDesc.slice(0, 15).map(row => {
-        let statusColor = "text-slate-500";
-        const statusStr = row.valve_status || "Unknown";
-        if (statusStr.includes("HIGH")) statusColor = "text-red-500";
-        else if (statusStr.includes("FLOW")) statusColor = "text-tech-success";
-        
-        const rowTurns = row.turns !== undefined ? row.turns : (row.valve_turns || 0);
-
-        return `<tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
+    const tableHtml = sortedDesc.slice(0, 15).map(row => `
+        <tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
             <td class="p-3 text-slate-500 text-[10px] font-mono">${getCorrectedDateTime(row.created_at)}</td>
             <td class="p-3 text-white font-medium">ID:${row.valve_id.slice(-5)}</td>
-            <td class="p-3 text-right ${statusColor} font-bold uppercase text-[10px]">${statusStr}</td>
-            <td class="p-3 text-right text-amber-400 font-bold font-mono">
-                ${rowTurns} <span class="text-[8px] text-slate-600">TRN</span>
-            </td>
-        </tr>`
-    }).join('');
+            <td class="p-3 text-right font-bold uppercase text-[10px] text-tech-cyan">${row.valve_status || "Unknown"}</td>
+            <td class="p-3 text-right text-amber-400 font-bold font-mono">${row.turns || 0} TRN</td>
+        </tr>`).join('');
     
     document.getElementById('logTableBody').innerHTML = tableHtml;
 }
 
 function runDiagnostics(pressure, turns, status) {
     let msg = "SYSTEM NOMINAL"; let color = "#00f2ff"; let icon = "fa-check-circle";
-    const diagSub = document.getElementById('diagSubStatus');
     if (turns > 0 && pressure < 10) {
         msg = "GHOST FLOW DETECTED"; color = "#ff2a2a"; icon = "fa-burst";
-        diagSub.classList.remove('hidden'); diagSub.innerText = "CRITICAL: Valve Open but Flow is Zero";
-    } else if (pressure > 2500) {
-        msg = "WARNING: HIGH PRESSURE"; color = "#fbbf24"; icon = "fa-exclamation-triangle";
-        diagSub.classList.add('hidden');
-    } else if (turns > 0 && pressure <= 800) {
-        msg = "LOW PRESSURE WARNING"; color = "#fbbf24"; icon = "fa-arrow-down";
-        diagSub.classList.remove('hidden'); diagSub.innerText = "Flow detected but pressure is suboptimal";
-    } else {
-        diagSub.classList.add('hidden');
     }
     const diagText = document.getElementById('diagStatus');
-    const diagPanel = document.getElementById('diagnosticPanel');
     const iconBox = document.getElementById('diagIconBox');
-    diagText.innerText = msg; diagText.style.color = color; diagText.style.textShadow = `0 0 10px ${color}55`;
-    diagPanel.style.borderLeftColor = color;
-    iconBox.style.color = color; iconBox.style.borderColor = color;
-    iconBox.innerHTML = `<i class="fas ${icon}"></i>`;
+    diagText.innerText = msg; diagText.style.color = color;
+    document.getElementById('diagnosticPanel').style.borderLeftColor = color;
+    if(iconBox) iconBox.innerHTML = `<i class="fas ${icon}"></i>`;
 }
 
 function processDailyStats(logs) {
     const grouped = {};
     logs.forEach(log => {
         const correctedDate = getCorrectedDateObject(log.created_at);
-        const y = correctedDate.getFullYear();
-        const m = String(correctedDate.getMonth()+1).padStart(2,'0');
-        const d = String(correctedDate.getDate()).padStart(2,'0');
-        const dateKey = `${y}-${m}-${d}`;
+        const dateKey = `${correctedDate.getFullYear()}-${String(correctedDate.getMonth()+1).padStart(2,'0')}-${String(correctedDate.getDate()).padStart(2,'0')}`;
         if (!grouped[dateKey]) grouped[dateKey] = [];
         grouped[dateKey].push(log);
     });
 
-    const todayDate = new Date();
-    const todayKey = `${todayDate.getFullYear()}-${String(todayDate.getMonth()+1).padStart(2,'0')}-${String(todayDate.getDate()).padStart(2,'0')}`;
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
     updateComplianceCard(grouped[todayKey] || []);
 
     const sortedDates = Object.keys(grouped).sort().reverse(); 
     let tableHtml = "";
     sortedDates.slice(0, 5).forEach(date => {
-        const dayLogs = grouped[date];
-        const stats = calculateDayMetrics(dayLogs);
+        const stats = calculateDayMetrics(grouped[date]);
         let scoreColor = stats.score >= 80 ? "text-tech-success" : (stats.score >= 50 ? "text-tech-warn" : "text-red-500");
-        let avgPColor = stats.avgPressure > 800 ? "text-green-500" : "text-slate-500";
-
         tableHtml += `<tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
             <td class="p-3 text-white font-bold">${date}</td>
             <td class="p-3 text-right text-slate-400">${stats.startTime}</td>
             <td class="p-3 text-right text-white">${stats.durationStr}</td>
             <td class="p-3 text-center font-bold ${scoreColor}">${stats.score}%</td>
-            <td class="p-3 text-center font-bold ${avgPColor}">${stats.avgPressure > 800 ? 'NORMAL' : 'LOW'}</td>
+            <td class="p-3 text-center font-bold text-slate-500">${stats.avgPressure > 0 ? stats.avgPressure + ' PSI' : '--'}</td>
         </tr>`;
     });
     document.getElementById('dailyStatsBody').innerHTML = tableHtml;
 }
 
 /**
- * INTEGRATED DIRECTIONAL COMPLIANCE LOGIC
+ * INTEGRATED DELTA COMPLIANCE LOGIC
  * - Starts clock at turns >= 2
- * - Stops clock when a reverse turn of -2 or more is detected
+ * - Stops clock when drop (prev - current) >= 2 OR current hits 0
  */
 function calculateDayMetrics(dayLogs) {
     if (!dayLogs || dayLogs.length === 0) return { startTime: "--:--", durationStr: "0m", score: 0, avgPressure: 0 };
 
-    // Sort chronologically to detect movement sequence
     const sorted = [...dayLogs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
     let sessionStart = null;
@@ -354,23 +267,24 @@ function calculateDayMetrics(dayLogs) {
         const currentT = current.turns !== undefined ? current.turns : (current.valve_turns || 0);
         const prevT = prev ? (prev.turns !== undefined ? prev.turns : (prev.valve_turns || 0)) : 0;
 
-        // 1. DETECT OPEN (+2 or more)
+        // 1. OPEN LOGIC (>= 2 turns)
         if (!isCurrentlyActive && currentT >= 2) {
             isCurrentlyActive = true;
             sessionStart = new Date(current.created_at);
         }
 
-        // 2. DETECT CLOSE (Drop of 2 or more from previous)
-        if (isCurrentlyActive && prev && (prevT - currentT >= 2)) {
-            isCurrentlyActive = false;
-            // The flow effectively ended at the timestamp BEFORE this drop
-            sessionEnd = new Date(prev.created_at);
+        // 2. CLOSE LOGIC (Drop of 2+ units OR hitting 0)
+        if (isCurrentlyActive && prev) {
+            const dropDelta = prevT - currentT;
+            if (dropDelta >= 2 || currentT === 0) {
+                isCurrentlyActive = false;
+                sessionEnd = new Date(prev.created_at); // Clock stops at last valid operational reading
+            }
         }
 
-        // Accumulate data for averages/duration while active
         if (isCurrentlyActive) {
             activeSessionLogs.push(current);
-            sessionEnd = new Date(current.created_at); // Continuously update end point
+            sessionEnd = new Date(current.created_at); 
         }
     }
 
