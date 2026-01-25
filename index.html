@@ -4,134 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Valve | Monitoring Center</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'tech-cyan': '#00f2ff',
-                        'tech-dark': '#050505',
-                        'tech-panel': '#0f1115',
-                        'tech-border': '#2a3b47',
-                        'tech-alert': '#ff2a2a',
-                        'tech-warn': '#fbbf24',
-                        'tech-success': '#10b981',
-                    },
-                    fontFamily: {
-                        'display': ['Rajdhani', 'sans-serif'],
-                        'mono': ['JetBrains Mono', 'monospace'],
-                    }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        :root {
-            --primary: #00f2ff;
-            --alert: #ff2a2a;
-            --bg-grid: rgba(0, 242, 255, 0.03);
-        }
-
-        body {
-            background-color: #020204;
-            color: #cdd6f4;
-            font-family: 'Rajdhani', sans-serif;
-            overflow-x: hidden;
-            background-image: 
-                linear-gradient(var(--bg-grid) 1px, transparent 1px),
-                linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
-            background-size: 30px 30px;
-        }
-
-        /* --- UI Components --- */
-        .tech-card {
-            background: rgba(15, 17, 21, 0.95);
-            border: 1px solid var(--tech-border);
-            position: relative;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(5px);
-        }
-
-        .tech-card::before {
-            content: ''; position: absolute; top: -1px; left: -1px; width: 10px; height: 10px;
-            border-top: 2px solid var(--primary); border-left: 2px solid var(--primary);
-        }
-        .tech-card::after {
-            content: ''; position: absolute; bottom: -1px; right: -1px; width: 10px; height: 10px;
-            border-bottom: 2px solid var(--primary); border-right: 2px solid var(--primary);
-        }
-
-        .neon-text { text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); }
-
-        .tech-input {
-            background: #000; border: 1px solid #334155; color: var(--primary);
-            font-family: 'JetBrains Mono', monospace; transition: all 0.3s ease;
-        }
-        .tech-input:focus {
-            border-color: var(--primary); box-shadow: 0 0 15px rgba(0, 242, 255, 0.2); outline: none;
-        }
-
-        .tech-btn {
-            background: linear-gradient(45deg, #0ea5e9, #00f2ff); color: #000; font-weight: 800;
-            text-transform: uppercase; border: none;
-            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
-            transition: all 0.2s;
-        }
-        .tech-btn:hover { transform: translateY(-2px); box-shadow: 0 0 20px rgba(0, 242, 255, 0.4); }
-
-        .gauge-container {
-            background: #1e293b; height: 4px; width: 100%; position: relative;
-        }
-        .gauge-fill {
-            height: 100%; background: var(--primary); box-shadow: 0 0 10px var(--primary);
-            transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
-        }
-
-        .fade-enter { animation: fadeIn 0.5s ease-out forwards; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .pulse-dot {
-            width: 8px; height: 8px; background: var(--primary); border-radius: 50%;
-            box-shadow: 0 0 10px var(--primary); animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; box-shadow: 0 0 10px var(--primary); }
-            50% { opacity: 0.5; box-shadow: 0 0 20px var(--primary); }
-            100% { opacity: 1; box-shadow: 0 0 10px var(--primary); }
-        }
-
-        /* Audit Ring for Daily Stats */
-        .score-ring {
-            width: 80px; height: 80px; border-radius: 50%;
-            background: conic-gradient(var(--score-color) var(--score-deg), #1e293b 0deg);
-            display: flex; align-items: center; justify-content: center;
-            position: relative; box-shadow: 0 0 15px rgba(0,0,0,0.5);
-        }
-        .score-inner {
-            width: 70px; height: 70px; background: #0f1115; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-family: 'JetBrains Mono'; font-weight: bold; color: white;
-        }
-
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #334155; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-
-        select option { background-color: #0f1115; color: #00f2ff; padding: 10px; }
-    </style>
-</head>
+    </head>
 <body class="antialiased selection:bg-cyan-500 selection:text-black">
 
     <div id="authSection" class="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -141,14 +18,37 @@
         <div class="tech-card p-10 w-full max-w-md text-center z-10">
             <div class="mb-8 relative">
                 <div class="w-16 h-16 mx-auto border border-cyan-500/30 rounded-full flex items-center justify-center bg-cyan-900/10 mb-4">
-                    <i class="fas fa-network-wired text-tech-cyan text-3xl"></i>
+                    <i class="fas fa-shield-halved text-tech-cyan text-3xl"></i>
                 </div>
-                <h1 class="text-3xl font-display font-bold text-white tracking-widest uppercase">Terminal Access</h1>
-                <p class="text-cyan-500/60 font-mono text-xs tracking-[0.2em] mt-1">SECURE UPLINK V2.0</p>
+                <h1 class="text-3xl font-display font-bold text-white tracking-widest uppercase">Restricted Area</h1>
+                <p class="text-cyan-500/60 font-mono text-xs tracking-[0.2em] mt-1">IDENTITY VERIFICATION REQUIRED</p>
             </div>
             
             <div class="space-y-6 text-left">
-                <div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider ml-1 mb-1 block">Operator ID</label>
+                        <input type="email" id="emailInput" class="tech-input w-full p-3 text-sm" placeholder="ACCESS-ID">
+                    </div>
+                    <div>
+                        <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider ml-1 mb-1 block">Passcode</label>
+                        <input type="password" id="passwordInput" class="tech-input w-full p-3 text-sm" placeholder="••••••••">
+                    </div>
+                </div>
+
+                <p id="authError" class="text-red-500 text-xs font-mono hidden"></p>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="btnLogin" class="tech-btn w-full py-3 text-sm tracking-wider">
+                        Authenticate
+                    </button>
+                    <button id="btnRegister" class="tech-btn w-full py-3 text-sm tracking-wider opacity-50 hover:opacity-100">
+                        New ID
+                    </button>
+                    
+                </div>
+    
+                <div class="pt-4 border-t border-slate-800">
                     <label class="text-[10px] uppercase font-bold text-slate-500 tracking-wider ml-1 mb-2 block">Target Endpoint (Ngrok)</label>
                     <div class="relative">
                         <span class="absolute left-4 top-3.5 text-cyan-500/50"><i class="fas fa-link"></i></span>
@@ -156,17 +56,6 @@
                             class="tech-input w-full p-3 pl-10 text-sm rounded-none">
                     </div>
                 </div>
-
-                <button onclick="enterDashboard()" class="tech-btn w-full py-4 tracking-widest flex items-center justify-center gap-3">
-                    <span>Initialize Connection</span> <i class="fas fa-chevron-right text-xs"></i>
-                </button>
-            </div>
-
-            <div class="mt-8 border-t border-slate-800 pt-6">
-                <p class="text-[10px] text-slate-600 font-mono">
-                    <span class="text-green-500">●</span> SYSTEM READY <br>
-                    WAITING FOR HANDSHAKE...
-                </p>
             </div>
         </div>
     </div>
@@ -187,8 +76,7 @@
                     
                     <div class="relative group mt-1 md:mt-0">
                         <i class="fas fa-caret-down absolute right-3 top-1/2 -translate-y-1/2 text-tech-cyan pointer-events-none text-xs"></i>
-                        <select id="deviceSelect" onchange="handleDeviceChange()" 
-                            class="appearance-none bg-tech-panel/50 border border-tech-cyan/30 text-tech-cyan text-lg md:text-2xl font-mono font-bold uppercase py-1 pl-4 pr-10 focus:outline-none focus:border-tech-cyan focus:shadow-[0_0_15px_rgba(0,242,255,0.2)] cursor-pointer hover:bg-tech-panel transition-colors rounded-sm">
+                        <select id="deviceSelect" class="appearance-none bg-tech-panel/50 border border-tech-cyan/30 text-tech-cyan text-lg md:text-2xl font-mono font-bold uppercase py-1 pl-4 pr-10 focus:outline-none focus:border-tech-cyan focus:shadow-[0_0_15px_rgba(0,242,255,0.2)] cursor-pointer hover:bg-tech-panel transition-colors rounded-sm">
                             <option value="">SCANNING...</option>
                         </select>
                     </div>
@@ -210,8 +98,8 @@
                     </div>
                 </div>
                 <div class="h-8 w-[1px] bg-white/10 hidden md:block"></div>
-                <button onclick="location.reload()" class="border border-red-900/50 bg-red-500/5 text-red-500 px-4 py-2 text-xs font-bold uppercase hover:bg-red-500 hover:text-white transition-colors">
-                    Abort / Disconnect
+                <button id="btnLogout" class="border border-red-900/50 bg-red-500/5 text-red-500 px-4 py-2 text-xs font-bold uppercase hover:bg-red-500 hover:text-white transition-colors">
+                    Disconnect
                 </button>
             </div>
         </header>
@@ -274,7 +162,6 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            
             <div class="lg:col-span-2 tech-card flex flex-col h-[300px]">
                 <div class="p-4 border-b border-white/5 bg-white/[0.02] flex justify-between items-center">
                     <h3 class="text-xs font-bold text-slate-300 uppercase tracking-widest">
@@ -357,400 +244,7 @@
             <p class="text-[9px] text-slate-700 font-mono uppercase">Industrial Control Systems v4.3 // Authorized Personnel Only</p>
         </div>
     </div>
-
-  <script>
-        let API_URL = ""; 
-        let globalData = [];      
-        let uniqueDevices = [];   
-        let currentDevice = null; 
-
-        // --- 1. Date & Time Formatter (Includes your -5.5h logic) ---
-        function getCorrectedDateTime(dateString) {
-            if (!dateString) return "--/-- --:--";
-            
-            let safeDate = dateString;
-            // Fix SQL string format if needed
-            if (typeof dateString === 'string' && dateString.indexOf('T') === -1 && dateString.indexOf('Z') === -1) {
-                safeDate = dateString.replace(" ", "T"); 
-            }
-
-            const dateObj = new Date(safeDate);
-            
-            if (isNaN(dateObj.getTime())) return "Invalid Time";
-
-            // Subtract 5.5 hours (Your custom logic)
-            const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000); 
-            
-            // Format: "Jan 24, 10:30:05 PM"
-            return new Date(fixedTime).toLocaleString('en-US', {
-                month: 'short', 
-                day: 'numeric',
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit',
-                hour12: true,
-                timeZone: 'Asia/Kolkata' 
-            });
-        }
-
-        // Keep this for calculations that need a raw Date object
-        function getCorrectedDateObject(dateString) {
-            let safeDate = dateString;
-            if (typeof dateString === 'string') safeDate = dateString.replace(" ", "T");
-            const dateObj = new Date(safeDate);
-            if (isNaN(dateObj.getTime())) return new Date(); 
-            
-            const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000);
-            return new Date(fixedTime);
-        }
-
-        // --- 2. Live System Clock (Now includes Date) ---
-        function startLiveClock() {
-            function update() {
-                const now = new Date();
-                // Format: "Mon, Jan 24 • 10:30:45 PM"
-                const datePart = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' });
-                const timePart = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' });
-                
-                document.getElementById('liveClock').innerHTML = `<span class="text-cyan-500/80">${datePart}</span> • ${timePart}`;
-            }
-            update(); 
-            setInterval(update, 1000); 
-        }
-
-        function enterDashboard() {
-            const inputUrl = document.getElementById('ngrokUrl').value;
-            if(!inputUrl) return alert("System Error: API Endpoint Required");
-            
-            API_URL = inputUrl.replace(/\/$/, ""); 
-            
-            const auth = document.getElementById('authSection');
-            const dash = document.getElementById('dashboardSection');
-            
-            auth.classList.add('hidden');
-            dash.classList.remove('hidden');
-            
-            startLiveClock();
-
-            setTimeout(() => {
-                dash.classList.remove('opacity-0');
-                dash.classList.add('fade-enter');
-            }, 100);
-            
-            fetchData();
-            setInterval(fetchData, 2000); 
-        }
-
-        async function fetchData() {
-            try {
-                const response = await fetch(`${API_URL}/api/history`, {
-                    headers: {
-                        "ngrok-skip-browser-warning": "true",
-                        "Content-Type": "application/json"
-                    }
-                });
-
-                if (!response.ok) throw new Error("Server Offline: " + response.status);
-                
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    globalData = await response.json();
-                } else {
-                    console.error("Received HTML instead of JSON.");
-                    throw new Error("Invalid Data Format");
-                }
-                
-                if(globalData.length > 0) {
-                    updateDeviceList(globalData);
-                    refreshView();
-                    
-                    const diagText = document.getElementById('diagStatus');
-                    if (diagText.innerText === "CONNECTION FAILURE") {
-                        document.getElementById('diagnosticPanel').style.borderLeftColor = "#00f2ff";
-                    }
-                }
-            } catch (error) {
-                console.error("Connection Error:", error);
-                const diagText = document.getElementById('diagStatus');
-                diagText.innerText = "CONNECTION FAILURE";
-                diagText.style.color = "#ff2a2a";
-                document.getElementById('diagnosticPanel').style.borderLeftColor = "#ff2a2a";
-            }
-        }
-
-        function updateDeviceList(data) {
-            const foundDevices = [...new Set(data.map(item => item.valve_id))];
-            
-            if (JSON.stringify(foundDevices.sort()) !== JSON.stringify(uniqueDevices.sort())) {
-                uniqueDevices = foundDevices;
-                const select = document.getElementById('deviceSelect');
-                const savedSelection = select.value;
-                
-                select.innerHTML = uniqueDevices.map(id => 
-                    `<option value="${id}">${id}</option>`
-                ).join('');
-
-                if (savedSelection && uniqueDevices.includes(savedSelection)) {
-                    select.value = savedSelection;
-                    if(currentDevice !== savedSelection) currentDevice = savedSelection;
-                } else if (uniqueDevices.length > 0) {
-                    select.value = uniqueDevices[0];
-                    currentDevice = uniqueDevices[0];
-                }
-            }
-        }
-
-        function handleDeviceChange() {
-            const select = document.getElementById('deviceSelect');
-            currentDevice = select.value;
-            refreshView();
-        }
-
-        function refreshView() {
-            if (!currentDevice || globalData.length === 0) return;
-            const deviceHistory = globalData.filter(d => d.valve_id === currentDevice);
-            
-            if (deviceHistory.length > 0) {
-                deviceHistory.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-                updateDashboard(deviceHistory);
-            }
-        }
-
-        function updateDashboard(historyData) {
-            const latest = historyData[0]; 
-            const pressure = latest.pressure_val || 0;
-            const turns = latest.valve_turns || latest.turns || 0; 
-            
-            // Pressure Display
-            const pEl = document.getElementById('pressureVal');
-            let pText = "LOW";
-            let pClass = "text-slate-400"; 
-
-            if (pressure > 2200) {
-                pText = "HIGH";
-                pClass = "text-tech-alert"; 
-            } else if (pressure > 800) {
-                pText = "NORMAL";
-                pClass = "text-tech-success"; 
-            } else {
-                pText = "LOW";
-                pClass = (turns > 0) ? "text-tech-warn" : "text-slate-400";
-            }
-            pEl.innerText = pText;
-            pEl.className = `text-3xl font-mono font-bold leading-none tracking-wider ${pClass}`;
-            
-            document.getElementById('valveTurns').innerText = turns;
-            
-            // --- UPDATED: Last Sync now shows Date + Time ---
-            // We reduce the text size slightly (text-xl) so the date fits in the box
-            const lastSyncEl = document.getElementById('lastSync');
-            lastSyncEl.innerText = getCorrectedDateTime(latest.created_at);
-            lastSyncEl.className = "text-xl font-mono font-bold text-white leading-none"; 
-
-            // Gauge
-            const percentage = Math.min((pressure / 3000) * 100, 100);
-            document.getElementById('pressureGauge').style.width = `${percentage}%`;
-
-            runDiagnostics(pressure, turns, latest.valve_status); 
-            processDailyStats(historyData);
-
-            // --- UPDATED: Log Table now shows Date + Time ---
-            const tableHtml = historyData.slice(0, 15).map(row => {
-                let pStatus = "LOW";
-                let pColor = "text-slate-500";
-                if(row.pressure_val > 2200) { pStatus = "HIGH"; pColor = "text-red-500"; }
-                else if(row.pressure_val > 800) { pStatus = "NORMAL"; pColor = "text-green-500"; }
-                
-                return `
-                <tr class="hover:bg-cyan-500/10 transition-colors">
-                    <td class="p-3 text-slate-500 text-[10px]">${getCorrectedDateTime(row.created_at)}</td>
-                    <td class="p-3 text-white">ID:${row.valve_id}</td>
-                    <td class="p-3 text-right ${pColor} font-bold">${pStatus}</td>
-                    <td class="p-3 text-right text-amber-400 font-bold">
-                        ${row.valve_turns || row.turns || 0}
-                    </td>
-                </tr>
-            `}).join('');
-            document.getElementById('logTableBody').innerHTML = tableHtml;
-        }
-
-        function runDiagnostics(pressure, turns, status) {
-            let msg = "SYSTEM NOMINAL";
-            let color = "#00f2ff"; 
-            let icon = "fa-check-circle";
-            const diagSub = document.getElementById('diagSubStatus');
-
-            if (turns > 0 && pressure < 10) {
-                msg = "GHOST FLOW DETECTED";
-                color = "#ff2a2a"; 
-                icon = "fa-burst";
-                diagSub.classList.remove('hidden');
-                diagSub.innerText = "CRITICAL: Valve Open but Flow is Zero";
-            }
-            else if (pressure > 2500) {
-                msg = "WARNING: HIGH PRESSURE";
-                color = "#fbbf24"; 
-                icon = "fa-exclamation-triangle";
-                diagSub.classList.add('hidden');
-            }
-            else if (turns > 0 && pressure <= 800) {
-                msg = "LOW PRESSURE WARNING";
-                color = "#fbbf24";
-                icon = "fa-arrow-down";
-                diagSub.classList.remove('hidden');
-                diagSub.innerText = "Flow detected but pressure is suboptimal";
-            }
-            else {
-                diagSub.classList.add('hidden');
-            }
-
-            const diagText = document.getElementById('diagStatus');
-            const diagPanel = document.getElementById('diagnosticPanel');
-            const iconBox = document.getElementById('diagIconBox');
-
-            diagText.innerText = msg;
-            diagText.style.color = color;
-            diagText.style.textShadow = `0 0 10px ${color}55`;
-            
-            diagPanel.style.borderLeftColor = color;
-            iconBox.style.color = color;
-            iconBox.style.borderColor = color;
-            iconBox.innerHTML = `<i class="fas ${icon}"></i>`;
-        }
-
-        function processDailyStats(logs) {
-            const grouped = {};
-            logs.forEach(log => {
-                const correctedDate = getCorrectedDateObject(log.created_at);
-                const y = correctedDate.getFullYear();
-                const m = String(correctedDate.getMonth()+1).padStart(2,'0');
-                const d = String(correctedDate.getDate()).padStart(2,'0');
-                const dateKey = `${y}-${m}-${d}`;
-
-                if (!grouped[dateKey]) grouped[dateKey] = [];
-                grouped[dateKey].push(log);
-            });
-
-            const todayDate = new Date();
-            const y = todayDate.getFullYear();
-            const m = String(todayDate.getMonth()+1).padStart(2,'0');
-            const d = String(todayDate.getDate()).padStart(2,'0');
-            const todayKey = `${y}-${m}-${d}`;
-            
-            const todayLogs = grouped[todayKey] || [];
-            updateComplianceCard(todayLogs);
-
-            const sortedDates = Object.keys(grouped).sort().reverse(); 
-            let tableHtml = "";
-            
-            sortedDates.slice(0, 5).forEach(date => {
-                const dayLogs = grouped[date];
-                dayLogs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-                
-                const stats = calculateDayMetrics(dayLogs);
-                
-                let scoreColor = "text-red-500";
-                if(stats.score >= 80) scoreColor = "text-tech-success";
-                else if(stats.score >= 50) scoreColor = "text-tech-warn";
-
-                let avgPText = "LOW";
-                let avgPColor = "text-slate-500";
-                if (stats.avgPressure > 2200) { avgPText = "HIGH"; avgPColor = "text-red-500"; }
-                else if (stats.avgPressure > 800) { avgPText = "NORMAL"; avgPColor = "text-green-500"; }
-
-                tableHtml += `
-                    <tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
-                        <td class="p-3 text-white font-bold">${date}</td>
-                        <td class="p-3 text-right text-slate-400">${stats.startTime}</td>
-                        <td class="p-3 text-right text-white">${stats.durationStr}</td>
-                        <td class="p-3 text-center font-bold ${scoreColor}">${stats.score}%</td>
-                        <td class="p-3 text-center font-bold ${avgPColor}">${avgPText}</td>
-                    </tr>
-                `;
-            });
-            document.getElementById('dailyStatsBody').innerHTML = tableHtml;
-        }
-
-        function calculateDayMetrics(dayLogs) {
-            let activeLogs = dayLogs.filter(l => (l.valve_turns || 0) > 0);
-            
-            if(activeLogs.length === 0) {
-                return { startTime: "--:--", durationStr: "0m", score: 0, ghostFlow: false, avgPressure: 0 };
-            }
-
-            const startObj = getCorrectedDateObject(activeLogs[0].created_at);
-            const startTimeStr = startObj.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: true});
-            
-            const firstOpen = new Date(activeLogs[0].created_at);
-            const lastOpen = new Date(activeLogs[activeLogs.length - 1].created_at);
-            const durationMs = lastOpen - firstOpen;
-            const durationMin = Math.max(Math.floor(durationMs / 60000), 1);
-            const durationHrs = Math.floor(durationMin / 60);
-            const durationRemMin = durationMin % 60;
-            
-            const hour = startObj.getHours(); 
-            const min = startObj.getMinutes();
-            
-            let timeScore = 0;
-            if (hour === 4 || (hour === 3 && min >= 45) || (hour === 4 && min <= 15)) {
-                timeScore = 50; 
-            } else if (hour === 3 || hour === 5) {
-                timeScore = 20; 
-            }
-
-            let durationScore = Math.min((durationMin / 120) * 50, 50); 
-            const totalScore = Math.floor(timeScore + durationScore);
-
-            const ghostFlow = activeLogs.some(l => l.pressure_val < 10);
-            const avgP = Math.floor(activeLogs.reduce((a, b) => a + (b.pressure_val||0), 0) / activeLogs.length);
-
-            return {
-                startTime: startTimeStr,
-                durationStr: `${durationHrs}h ${durationRemMin}m`,
-                score: totalScore,
-                ghostFlow: ghostFlow,
-                avgPressure: avgP
-            };
-        }
-
-        function updateComplianceCard(todayLogs) {
-            todayLogs.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-            const metrics = calculateDayMetrics(todayLogs);
-
-            document.getElementById('complianceScore').innerText = metrics.score + "%";
-            document.getElementById('startTimeDisplay').innerText = metrics.startTime;
-            document.getElementById('durationDisplay').innerText = metrics.durationStr;
-            
-            const avgDisplay = document.getElementById('avgPressureDisplay');
-            let avgText = "LOW";
-            let avgClass = "text-slate-400 font-bold";
-
-            if (metrics.avgPressure > 2200) {
-                avgText = "HIGH";
-                avgClass = "text-tech-alert font-bold";
-            } else if (metrics.avgPressure > 800) {
-                avgText = "NORMAL";
-                avgClass = "text-tech-success font-bold";
-            }
-
-            avgDisplay.innerText = avgText;
-            avgDisplay.className = avgClass;
-
-            const ring = document.getElementById('complianceRing');
-            let color = "#ef4444"; 
-            let statusText = "NON-COMPLIANT";
-            let statusClass = "text-[10px] font-bold text-red-500 uppercase mt-1";
-
-            if (metrics.score >= 80) { color = "#10b981"; statusText = "SCHEDULE ADHERED"; statusClass = "text-[10px] font-bold text-tech-success uppercase mt-1"; }
-            else if (metrics.score >= 50) { color = "#fbbf24"; statusText = "PARTIAL ADHERENCE"; statusClass = "text-[10px] font-bold text-tech-warn uppercase mt-1"; }
-            
-            ring.style.setProperty('--score-color', color);
-            ring.style.setProperty('--score-deg', `${(metrics.score / 100) * 360}deg`);
-            
-            const statusEl = document.getElementById('scheduleStatus');
-            statusEl.innerText = statusText;
-            statusEl.className = statusClass;
-        }
-    </script>
+    
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>
