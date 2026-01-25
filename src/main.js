@@ -129,6 +129,7 @@ function getCorrectedDateTime(dateString) {
     }
     const dateObj = new Date(safeDate);
     if (isNaN(dateObj.getTime())) return "Invalid Time";
+    // Correction for IST offset if server sends UTC
     const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000); 
     return new Date(fixedTime).toLocaleString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' 
@@ -220,11 +221,17 @@ function refreshView() {
     }
 }
 
+/**
+ * UPDATED: updateDashboard
+ * Now correctly maps 'valve_status' and 'turns' directly from your DB schema
+ */
 function updateDashboard(historyData) {
     const latest = historyData[0]; 
     const pressure = latest.pressure_val || 0;
-    const turns = latest.valve_turns || latest.turns || 0; 
+    // Handle potential column name variants (valve_turns or turns)
+    const turns = latest.turns !== undefined ? latest.turns : (latest.valve_turns || 0); 
     
+    // 1. Update Pressure Card
     const pEl = document.getElementById('pressureVal');
     let pText = "LOW";
     let pClass = "text-slate-400"; 
@@ -235,27 +242,43 @@ function updateDashboard(historyData) {
     pEl.innerText = pText;
     pEl.className = `text-3xl font-mono font-bold leading-none tracking-wider ${pClass}`;
     
+    // 2. Update Turns Card
     document.getElementById('valveTurns').innerText = turns;
+    
+    // 3. Update Sync Card
     const lastSyncEl = document.getElementById('lastSync');
     lastSyncEl.innerText = getCorrectedDateTime(latest.created_at);
     lastSyncEl.className = "text-xl font-mono font-bold text-white leading-none"; 
     
+    // 4. Update Gauge
     const percentage = Math.min((pressure / 3000) * 100, 100);
     document.getElementById('pressureGauge').style.width = `${percentage}%`;
 
+    // 5. Run Logic & Stats
     runDiagnostics(pressure, turns, latest.valve_status); 
     processDailyStats(historyData);
 
+    // 6. Generate Real-time Table (Updated to show Status and Turns columns)
     const tableHtml = historyData.slice(0, 15).map(row => {
-        let pStatus = "LOW"; let pColor = "text-slate-500";
-        if(row.pressure_val > 2200) { pStatus = "HIGH"; pColor = "text-red-500"; }
-        else if(row.pressure_val > 800) { pStatus = "NORMAL"; pColor = "text-green-500"; }
-        return `<tr class="hover:bg-cyan-500/10 transition-colors">
-            <td class="p-3 text-slate-500 text-[10px]">${getCorrectedDateTime(row.created_at)}</td>
-            <td class="p-3 text-white">ID:${row.valve_id}</td>
-            <td class="p-3 text-right ${pColor} font-bold">${pStatus}</td>
-            <td class="p-3 text-right text-amber-400 font-bold">${row.valve_turns || row.turns || 0}</td>
-        </tr>`}).join('');
+        // Color coding logic for the status string
+        let statusColor = "text-slate-500";
+        const statusStr = row.valve_status || "Unknown";
+        
+        if (statusStr.includes("HIGH")) statusColor = "text-red-500";
+        else if (statusStr.includes("FLOW")) statusColor = "text-tech-success";
+        
+        const rowTurns = row.turns !== undefined ? row.turns : (row.valve_turns || 0);
+
+        return `<tr class="hover:bg-cyan-500/10 transition-colors border-b border-white/5">
+            <td class="p-3 text-slate-500 text-[10px] font-mono">${getCorrectedDateTime(row.created_at)}</td>
+            <td class="p-3 text-white font-medium">ID:${row.valve_id.slice(-5)}</td>
+            <td class="p-3 text-right ${statusColor} font-bold uppercase text-[10px]">${statusStr}</td>
+            <td class="p-3 text-right text-amber-400 font-bold font-mono">
+                ${rowTurns} <span class="text-[8px] text-slate-600">TRN</span>
+            </td>
+        </tr>`
+    }).join('');
+    
     document.getElementById('logTableBody').innerHTML = tableHtml;
 }
 
@@ -325,7 +348,7 @@ function processDailyStats(logs) {
 }
 
 function calculateDayMetrics(dayLogs) {
-    let activeLogs = dayLogs.filter(l => (l.valve_turns || 0) > 0);
+    let activeLogs = dayLogs.filter(l => (l.turns || l.valve_turns || 0) > 0);
     if(activeLogs.length === 0) return { startTime: "--:--", durationStr: "0m", score: 0, ghostFlow: false, avgPressure: 0 };
     const startObj = getCorrectedDateObject(activeLogs[0].created_at);
     const startTimeStr = startObj.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit', hour12: true});
@@ -341,7 +364,7 @@ function calculateDayMetrics(dayLogs) {
     else if (hour === 3 || hour === 5) { timeScore = 20; }
     let durationScore = Math.min((durationMin / 120) * 50, 50); 
     const totalScore = Math.floor(timeScore + durationScore);
-    const ghostFlow = activeLogs.some(l => l.pressure_val < 10);
+    const ghostFlow = activeLogs.some(l => (l.pressure_val || 0) < 10);
     const avgP = Math.floor(activeLogs.reduce((a, b) => a + (b.pressure_val||0), 0) / activeLogs.length);
     return { startTime: startTimeStr, durationStr: `${durationHrs}h ${durationRemMin}m`, score: totalScore, ghostFlow: ghostFlow, avgPressure: avgP };
 }
