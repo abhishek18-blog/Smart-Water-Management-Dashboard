@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    </head>
+</head>
 <body class="antialiased selection:bg-cyan-500 selection:text-black">
 
     <div id="authSection" class="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden">
@@ -45,7 +45,6 @@
                     <button id="btnRegister" class="tech-btn w-full py-3 text-sm tracking-wider opacity-50 hover:opacity-100">
                         New ID
                     </button>
-                    
                 </div>
     
                 <div class="pt-4 border-t border-slate-800">
@@ -121,20 +120,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="tech-card p-6">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Piezoelectric Sensor Reading</div>
-                    <i class="fas fa-gauge-high text-tech-cyan"></i>
-                </div>
-                <div class="flex items-end gap-2 mb-4">
-                    <div id="pressureVal" class="text-3xl font-mono font-bold text-white leading-none tracking-wider">--</div>
-                </div>
-                <div class="gauge-container">
-                    <div id="pressureGauge" class="gauge-fill" style="width: 0%"></div>
-                </div>
-            </div>
-
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="tech-card p-6">
                 <div class="flex justify-between items-start mb-4">
                     <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">Valve Rotations</div>
@@ -176,8 +162,7 @@
                                 <th class="p-3 text-right">Start Time</th>
                                 <th class="p-3 text-right">Duration</th>
                                 <th class="p-3 text-center">Compliance</th>
-                                <th class="p-3">Avg Pressure</th>
-                            </tr>
+                                </tr>
                         </thead>
                         <tbody id="dailyStatsBody" class="divide-y divide-white/5">
                             </tbody>
@@ -209,11 +194,7 @@
                         <span class="text-slate-500">Flow Duration:</span>
                         <span id="durationDisplay" class="text-white">0 hrs 0 min</span>
                     </div>
-                    <div class="flex justify-between text-xs font-mono">
-                        <span class="text-slate-500">Avg Pressure:</span>
-                        <span id="avgPressureDisplay" class="text-white font-bold">--</span>
                     </div>
-                </div>
             </div>
         </div>
 
@@ -230,7 +211,7 @@
                         <tr>
                             <th class="p-3">Timestamp (IST)</th>
                             <th class="p-3">Device ID</th>
-                            <th class="p-3 text-right">Pressure Status</th>
+                            <th class="p-3 text-right">Status</th>
                             <th class="p-3 text-right">Turns</th>
                         </tr>
                     </thead>
