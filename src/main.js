@@ -102,21 +102,39 @@ function enterDashboard() {
     select.addEventListener('change', handleDeviceChange);
 }
 
-function getCorrectedDateTime(dateString) {
-    if (!dateString) return "--/-- --:--";
-    let safeDate = dateString.replace(" ", "T"); 
-    const dateObj = new Date(safeDate);
+// FIXED: Bulletproof Time Formatter
+function getCorrectedDateTime(dateInput) {
+    if (!dateInput) return "--/-- --:--";
+
+    let dateObj;
+    if (typeof dateInput === 'string') {
+        // Standardizes "YYYY-MM-DD HH:MM:SS" to ISO format
+        const safeDate = dateInput.includes('T') ? dateInput : dateInput.replace(" ", "T");
+        dateObj = new Date(safeDate);
+    } else {
+        dateObj = new Date(dateInput);
+    }
+
     if (isNaN(dateObj.getTime())) return "Invalid Time";
+
+    // Correction for IST offset (Subtracting 5.5 hours to align with server/local mismatch)
     const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000); 
+    
     return new Date(fixedTime).toLocaleString('en-US', {
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' 
     });
 }
 
-function getCorrectedDateObject(dateString) {
-    let safeDate = dateString.replace(" ", "T");
-    const dateObj = new Date(safeDate);
-    if (isNaN(dateObj.getTime())) return new Date(); 
+function getCorrectedDateObject(dateInput) {
+    if (!dateInput) return new Date();
+    let dateObj;
+    if (typeof dateInput === 'string') {
+        const safeDate = dateInput.includes('T') ? dateInput : dateInput.replace(" ", "T");
+        dateObj = new Date(safeDate);
+    } else {
+        dateObj = new Date(dateInput);
+    }
+    if (isNaN(dateObj.getTime())) return new Date();
     const fixedTime = dateObj.getTime() - (5.5 * 60 * 60 * 1000);
     return new Date(fixedTime);
 }
@@ -141,17 +159,19 @@ async function fetchData() {
         if (!response.ok) throw new Error("Offline");
         globalData = await response.json();
         
-        if(globalData.length > 0) {
+        if(globalData && globalData.length > 0) {
             updateDeviceList(globalData);
             refreshView();
-            document.getElementById('diagnosticPanel').style.borderLeftColor = "#00f2ff";
+            const diagPanel = document.getElementById('diagnosticPanel');
+            if (diagPanel) diagPanel.style.borderLeftColor = "#00f2ff";
         }
     } catch (error) {
-        const diagText = document.getElementById('diagStatus');
-        if(diagText) {
-            diagText.innerText = "CONNECTION FAILURE";
-            diagText.style.color = "#ff2a2a";
-            document.getElementById('diagnosticPanel').style.borderLeftColor = "#ff2a2a";
+        const diagStatus = document.getElementById('diagStatus');
+        if(diagStatus) {
+            diagStatus.innerText = "CONNECTION FAILURE";
+            diagStatus.style.color = "#ff2a2a";
+            const diagPanel = document.getElementById('diagnosticPanel');
+            if (diagPanel) diagPanel.style.borderLeftColor = "#ff2a2a";
         }
     }
 }
@@ -173,8 +193,11 @@ function updateDeviceList(data) {
 }
 
 function handleDeviceChange() {
-    currentDevice = document.getElementById('deviceSelect').value;
-    refreshView();
+    const select = document.getElementById('deviceSelect');
+    if (select) {
+        currentDevice = select.value;
+        refreshView();
+    }
 }
 
 function refreshView() {
@@ -190,27 +213,33 @@ function updateDashboard(historyData) {
     const latest = historyData[0];
     const turns = latest.turns ?? latest.valve_turns ?? 0; 
     
-    // 1. UPDATE VISIBLE CARDS
-    document.getElementById('valveTurns').innerText = turns;
-    document.getElementById('lastSync').innerText = getCorrectedDateTime(latest.created_at);
+    // Update Rotation Card
+    const turnsEl = document.getElementById('valveTurns');
+    if (turnsEl) turnsEl.innerText = turns;
 
-    // 2. RUN LOGIC & STATS (Pressure removed from here)
+    // Update Sync Card with fixed date logic
+    const syncEl = document.getElementById('lastSync');
+    if (syncEl) syncEl.innerText = getCorrectedDateTime(latest.created_at);
+
     runDiagnostics(turns, latest.valve_status); 
     processDailyStats(historyData);
 
-    // 3. REFRESH EVENT LOG (Removed Pressure column)
-    document.getElementById('logTableBody').innerHTML = historyData.slice(0, 15).map(row => {
-        let statusColor = "text-tech-success";
-        const statusStr = row.valve_status || "Unknown";
-        if (statusStr.includes("HIGH") || statusStr.includes("LEAK")) statusColor = "text-red-500";
+    // Update Event Table (Removed Pressure references)
+    const logBody = document.getElementById('logTableBody');
+    if (logBody) {
+        logBody.innerHTML = historyData.slice(0, 15).map(row => {
+            let statusColor = "text-tech-success";
+            const statusStr = row.valve_status || "Unknown";
+            if (statusStr.includes("HIGH") || statusStr.includes("LEAK")) statusColor = "text-red-500";
 
-        return `<tr class="hover:bg-cyan-500/10 border-b border-white/5">
-            <td class="p-3 text-slate-500 font-mono">${getCorrectedDateTime(row.created_at)}</td>
-            <td class="p-3 text-white">ID:${row.valve_id.slice(-5)}</td>
-            <td class="p-3 text-right ${statusColor} font-bold uppercase">${statusStr}</td>
-            <td class="p-3 text-right text-amber-400 font-mono">${row.turns ?? 0} TRN</td>
-        </tr>`;
-    }).join('');
+            return `<tr class="hover:bg-cyan-500/10 border-b border-white/5">
+                <td class="p-3 text-slate-500 font-mono">${getCorrectedDateTime(row.created_at)}</td>
+                <td class="p-3 text-white">ID:${row.valve_id.slice(-5)}</td>
+                <td class="p-3 text-right ${statusColor} font-bold uppercase">${statusStr}</td>
+                <td class="p-3 text-right text-amber-400 font-mono">${row.turns ?? 0} TRN</td>
+            </tr>`;
+        }).join('');
+    }
 }
 
 function runDiagnostics(turns, dbStatus) {
@@ -223,16 +252,18 @@ function runDiagnostics(turns, dbStatus) {
 
     if (turns > 0) {
         displayStatus = dbStatus || "FLOW DETECTED";
-        color = "#10b981"; // Success Green
-        diagSub.classList.add('hidden');
+        color = "#10b981"; 
+        if (diagSub) diagSub.classList.add('hidden');
     } else {
-        diagSub.classList.add('hidden');
+        if (diagSub) diagSub.classList.add('hidden');
     }
 
-    diagText.innerText = displayStatus;
-    diagText.style.color = color;
-    diagText.style.textShadow = `0 0 10px ${color}55`;
-    diagPanel.style.borderLeftColor = color;
+    if (diagText) {
+        diagText.innerText = displayStatus;
+        diagText.style.color = color;
+        diagText.style.textShadow = `0 0 10px ${color}55`;
+    }
+    if (diagPanel) diagPanel.style.borderLeftColor = color;
 }
 
 function processDailyStats(logs) {
@@ -264,7 +295,8 @@ function processDailyStats(logs) {
             <td class="p-3 text-center font-bold ${scoreColor}">${stats.score}%</td>
         </tr>`;
     });
-    document.getElementById('dailyStatsBody').innerHTML = tableHtml;
+    const dailyBody = document.getElementById('dailyStatsBody');
+    if (dailyBody) dailyBody.innerHTML = tableHtml;
 }
 
 function calculateDayMetrics(dayLogs) {
@@ -277,7 +309,6 @@ function calculateDayMetrics(dayLogs) {
     const durationMs = new Date(activeLogs[activeLogs.length - 1].created_at) - new Date(activeLogs[0].created_at);
     const durationMin = Math.max(Math.floor(durationMs / 60000), 1);
     
-    // Scoring logic based on time of day (example schedule: 4 AM)
     const hour = startObj.getHours();
     let timeScore = (hour === 4) ? 50 : 10;
     let durationScore = Math.min((durationMin / 120) * 50, 50); 
@@ -291,18 +322,26 @@ function calculateDayMetrics(dayLogs) {
 
 function updateComplianceCard(todayLogs) {
     const metrics = calculateDayMetrics(todayLogs);
-    document.getElementById('complianceScore').innerText = metrics.score + "%";
-    document.getElementById('startTimeDisplay').innerText = metrics.startTime;
-    document.getElementById('durationDisplay').innerText = metrics.durationStr;
-
+    
+    const scoreEl = document.getElementById('complianceScore');
+    const startEl = document.getElementById('startTimeDisplay');
+    const durEl = document.getElementById('durationDisplay');
     const ring = document.getElementById('complianceRing');
+    const statusEl = document.getElementById('scheduleStatus');
+
+    if (scoreEl) scoreEl.innerText = metrics.score + "%";
+    if (startEl) startEl.innerText = metrics.startTime;
+    if (durEl) durEl.innerText = metrics.durationStr;
+
     let color = "#ef4444"; 
     let statusText = "NON-COMPLIANT";
     
     if (metrics.score >= 80) { color = "#10b981"; statusText = "SCHEDULE ADHERED"; }
     else if (metrics.score >= 50) { color = "#fbbf24"; statusText = "PARTIAL ADHERENCE"; }
 
-    ring.style.setProperty('--score-color', color);
-    ring.style.setProperty('--score-deg', `${(metrics.score / 100) * 360}deg`);
-    document.getElementById('scheduleStatus').innerText = statusText;
+    if (ring) {
+        ring.style.setProperty('--score-color', color);
+        ring.style.setProperty('--score-deg', `${(metrics.score / 100) * 360}deg`);
+    }
+    if (statusEl) statusEl.innerText = statusText;
 }
